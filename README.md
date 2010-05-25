@@ -4,6 +4,10 @@ The plugin also defines a template tag: `<mt:IfOfflineMode><mt:Else></mt:IfOffli
 
 This template tag can be used to output templates differently when publishing for offline distribution. 
 
+# Release Notes
+
+* The copying of static files cannot follow symlinks. If your mt-static directory utilizes symlinks, please switch to hard links or physically copy the files to the mt-static directory.
+
 # Installation
 
 To install this plugin follow the instructions found here:
