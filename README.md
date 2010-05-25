@@ -1,6 +1,14 @@
 This plugin allows for users to publish a site to alternate directory. It will automatically publish the entire site to that directory, as well as all static files, and before writing files to the target directory rewrite all URLs accordingly so that they use the `file://` syntax as opposed to `http://`.
 
-The plugin also defines a template tag: `<mt:IfOfflineMode><mt:Else></mt:IfOfflineMode>`
+# Usage
+
+To publish a site for offline use, navigate to the List Templates screen. Then click "Publish Offline Version" in the page actions widget on the right hand side.
+
+# Template Tags
+
+The plugin also defines the following template tag: 
+
+    <mt:IfOfflineMode><mt:Else></mt:IfOfflineMode>
 
 This template tag can be used to output templates differently when publishing for offline distribution. 
 
