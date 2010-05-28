@@ -131,7 +131,8 @@ sub _create_batch {
     _create_copy_static_job( $batch );
 }
 
-# This is invoked just before the file is written. We use this to re-write all paths
+# This is invoked just before the file is written. We use this to re-write all URLs
+# to map http://... to file://...
 sub build_page {
     my ( $cb, %args ) = @_;
     my $fi = $args{'file_info'};

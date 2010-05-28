@@ -62,13 +62,13 @@ sub work {
         my $batch;
         if ($mt_job->has_column('offline_batch_id')) {
             $batch = MT->model('offline_batch')->load( $mt_job->offline_batch_id );
-#            my $blog = MT->model('blog')->load( $fi->blog_id );
-#            my $sp   = $blog->site_path;
-#            my $fp = $fi->file_path;
-#            $fp =~ s/^$sp//;
-#            my $np = File::Spec->catfile($batch->path, $fp);
-#            # TODO - change $fi record to point to different base directory
-#            $fi->file_path($np);
+            my $blog = MT->model('blog')->load( $fi->blog_id );
+            my $sp   = $blog->site_path;
+            my $fp = $fi->file_path;
+            $fp =~ s/^$sp//;
+            my $np = File::Spec->catfile($batch->path, $fp);
+            # TODO - change $fi record to point to different base directory
+            $fi->file_path($np);
         } else {
             MT->log( "Apparently, the job does not have the offline_batch_id column" );
         }
