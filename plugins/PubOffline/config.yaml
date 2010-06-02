@@ -11,7 +11,7 @@ object_types:
 
 tags:
   block:
-    'IsOfflineMode?': $PubOffline::PubOffline::Plugin::tag_is_offline
+    IsOfflineMode?: $PubOffline::PubOffline::Plugin::tag_is_offline
 
 applications:
   cms:
