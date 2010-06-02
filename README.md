@@ -8,9 +8,15 @@ To publish a site for offline use, navigate to the List Templates screen. Then c
 
 The plugin also defines the following template tag: 
 
-    <mt:IfOfflineMode><mt:Else></mt:IfOfflineMode>
+    <mt:IsOfflineMode><mt:Else></mt:IsOfflineMode>
 
-This template tag can be used to output templates differently when publishing for offline distribution. 
+This template tag can be used to output templates differently when publishing for offline distribution.
+
+In particular, when outputting Permalinks that end with an index filename, notice that the published URL does not include this. In other words, with a template mapping of `folder-path/page-basename/index.html`, the published file will be at `/folder/page-basename/` and the index.html will be excluded. When publishing for offline use, this will cause the browser to open a folder and display its contents and does _not_ default to displaying `index.html`. The following code remedies the problem, providing the expected URLs for the online version, and functional URLs for the offline version:
+
+    <mt:PagePermalink><mt:IsOfflineMode>/index.html</mt:IsOfflineMode>
+
+Of course, this method can be used for Entry, Category, etc Permalinks, too.
 
 # Release Notes
 

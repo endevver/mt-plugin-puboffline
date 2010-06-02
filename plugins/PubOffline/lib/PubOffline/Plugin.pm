@@ -168,7 +168,6 @@ sub build_page {
 # This is a near copy of the build_file_filter in MT::WeblogPublisher
 sub build_file_filter {
     my ( $cb, %args ) = @_;
-
     my $fi = $args{'file_info'};
 
     # Prevents requeuing. In other words it tells the Worker making a call to
