@@ -65,7 +65,7 @@ sub work {
                         { id => 'Puboffline blog '.$batch->blog_id, 
                           kind => 'po' });
         my $blog_site_path = $session->data;
-        $session->remove;
+#        $session->remove;
 
         my $batch_file_path = $batch->path;
         my $iter = MT->model('asset')->load_iter({blog_id => $batch->blog_id});
