@@ -129,6 +129,17 @@ sub _create_batch {
     my $pub = MT::WeblogPublisher->new;
     $pub->rebuild( BlogID => $blog_id );
     _create_copy_static_job( $batch );
+    
+    # Save the "real" blog site path so that it can be used later to copy the assets.
+    use MT::Session;
+    my $session = MT::Session->new;
+    $session->id('PubOffline blog '.$blog_id);
+    $session->kind('po');
+    my $blog = MT->model('blog')->load($blog_id);
+    $session->data( $blog->site_path );
+    $session->start(time());
+    $session->save;
+    _create_copy_asset_job( $batch );
 }
 
 # This is invoked just before the file is written. We use this to re-write all URLs
@@ -242,6 +253,29 @@ sub _create_copy_static_job {
     $job->save or MT->log({
         blog_id => $batch->blog_id,
         message => "Could not queue copy static job: " . $job->errstr
+    });
+}
+
+sub _create_copy_asset_job {
+    my ($batch) = @_;
+
+    # Ok, let's build the Schwartz Job.
+    require MT::TheSchwartz;
+    my $ts = MT::TheSchwartz->instance();
+    my $func_id = $ts->funcname_to_id($ts->driver_for,
+                                      $ts->shuffled_databases,
+                                      'MT::Worker::CopyAssetOffline');
+    my $job = MT->model('ts_job')->new();
+    $job->funcid( $func_id );
+    $job->uniqkey( $batch->id );
+    $job->offline_batch_id( $batch->id );
+    $job->priority( 9 );
+    $job->grabbed_until(1);
+    $job->run_after(1);
+    $job->coalesce( ( $batch->blog_id || 0 ) . ':' . $$ . ':' . 9 . ':' . ( time - ( time % 10 ) ) );
+    $job->save or MT->log({
+        blog_id => $batch->blog_id,
+        message => "Could not queue copy asset job: " . $job->errstr
     });
 }
 

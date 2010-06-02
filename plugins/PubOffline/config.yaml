@@ -1,7 +1,7 @@
 id: PubOffline
 name: 'Publish Offline'
 description: "This plugin allows administrators to publish a version of their site to another directory on their file system for the express purpose of creating a version of their site offline. It also provides for designers a set of template tags to conditionally display content depending upon whether or not the user is publishing the off or online version of their site."
-version: 0.2
+version: 0.3
 schema_version: 2.1
 
 object_types:
@@ -51,3 +51,6 @@ task_workers:
   copy_static_offline:
     label: "Copies static files into an offline folder"
     class: 'MT::Worker::CopyStaticOffline'
+  copy_asset_offiline:
+    label: "Copies assets into an offline folder"
+    class: 'MT::Worker::CopyAssetOffline'
