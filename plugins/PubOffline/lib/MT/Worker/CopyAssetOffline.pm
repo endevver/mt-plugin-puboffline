@@ -68,7 +68,7 @@ sub work {
 #        $session->remove;
 
         my $batch_file_path = $batch->path;
-        my $iter = MT->model('asset')->load_iter({blog_id => $batch->blog_id});
+        my $iter = MT->model('asset')->load_iter({blog_id => $batch->blog_id, class => '*',});
         while ( my $asset = $iter->() ) {
             # We need to rebuild the asset file path as the real, "online"
             # path, so that the file can be found.
