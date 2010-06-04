@@ -62,10 +62,18 @@ sub work {
         my $batch;
         if ($mt_job->has_column('offline_batch_id')) {
             $batch = MT->model('offline_batch')->load( $mt_job->offline_batch_id );
-            my $blog = MT->model('blog')->load( $fi->blog_id );
-            my $sp   = $blog->site_path;
+            # The blog site path has already been changed to the offline
+            # version, so it can't be grabbed this way.
+            #my $blog = MT->model('blog')->load( $fi->blog_id );
+            #my $sp   = $blog->site_path;
+            # The real blog site path was saved previously; grab it!
+            use MT::Session;
+            my $session = MT::Session::get_unexpired_value(86400, 
+                            { id => 'Puboffline blog '.$batch->blog_id, 
+                              kind => 'po' });
+            my $sp = $session->data;
             my $fp = $fi->file_path;
-            $fp =~ s/^$sp//;
+            $fp =~ s/^$sp(\/)*//;
             my $np = File::Spec->catfile($batch->path, $fp);
             # TODO - change $fi record to point to different base directory
             $fi->file_path($np);

@@ -153,14 +153,62 @@ sub build_page {
         my $target  = $batch->path;
         $target = $target . '/' if $target !~ /\/$/;
         my $pattern = $fi->{'__original_site_url'};
-        my $replace = caturl("file:\/\/\/",$target);
         my $content = $args{'Content'};
-        $$content =~ s/$pattern/$replace/mg;
+
+        # First determine if the current file is at the root of the blog
+        my $file_path = $fi->file_path;
+        $file_path =~ s/$target//;
+        my ($vol, $dirs_path, $file) = File::Spec->splitpath($file_path);
+        my @dirs = File::Spec->splitdir( $dirs_path );
+
+        if ( scalar @dirs >= 1 ) {
+            # If the file is not at the root, (that is, there were directories
+            # found) we need to determine how many folders up we need to go to
+            # get back to the root of the blog.
+            $$content =~ s{$pattern(.*?)("|')}{
+                ($vol, $dirs_path, $file) = File::Spec->splitpath($1);
+                @dirs = File::Spec->splitdir( $dirs_path );
+                unshift @dirs, '..';
+                my $new_dirs_path = File::Spec->catdir( @dirs );
+                my $path = caturl($new_dirs_path, $file);
+                $path . $2;
+            }emgx;
+        }
+        else {
+            # If the file is at the root, we just need to generate a simple
+            # relative URL that doesn't need to traverse up a folder at all.
+            $$content =~ s{$pattern(.*?)("|')}{
+                # abs2rel will convert the path to something relative.
+                # $2 is the single or double quote to be included.
+                File::Spec->abs2rel( $1 ) . $2;
+            }emgx;
+        }
 
         require MT::Template::ContextHandlers;
         my $static_pattern = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
-        my $static_replace = caturl($replace,'static') . '/';
-        $$content =~ s/$static_pattern/$static_replace/mg;
+        if ( scalar @dirs >= 1 ) {
+            # If the file is not at the root, (that is, there were directories
+            # found) we need to determine how many folders up we need to go to
+            # get back to the root of the blog.
+            $$content =~ s{$static_pattern(.*?)("|')}{
+                ($vol, $dirs_path, $file) = File::Spec->splitpath($1);
+                @dirs = File::Spec->splitdir( $dirs_path );
+                unshift @dirs, 'static';
+                unshift @dirs, '..';
+                my $new_dirs_path = File::Spec->catdir( @dirs );
+                my $path = caturl($new_dirs_path, $file);
+                $path . $2;
+            }emgx;
+        }
+        else {
+            # If the file is at the root, we just need to generate a simple
+            # relative URL that doesn't need to traverse up a folder at all.
+            $$content =~ s{$pattern(.*?)("|')}{
+                # abs2rel will convert the path to something relative.
+                # $2 is the single or double quote to be included.
+                File::Spec->abs2rel( $1 ) . $2;
+            }emgx;
+        }
     }
 }
 
