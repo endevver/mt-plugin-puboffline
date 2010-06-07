@@ -51,6 +51,6 @@ task_workers:
   copy_static_offline:
     label: "Copies static files into an offline folder"
     class: 'MT::Worker::CopyStaticOffline'
-  copy_asset_offiline:
+  copy_asset_offline:
     label: "Copies assets into an offline folder"
     class: 'MT::Worker::CopyAssetOffline'

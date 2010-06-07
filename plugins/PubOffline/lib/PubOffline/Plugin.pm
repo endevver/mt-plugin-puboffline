@@ -151,7 +151,7 @@ sub build_page {
         # Time to override the Blog's site path to the user specified site path
         my $batch   = $fi->{'offline_batch'};
         my $target  = $batch->path;
-        $target = $target . '/' if $target !~ /\/$/;
+        #$target = $target . '/' if $target !~ /\/$/;
         my $pattern = $fi->{'__original_site_url'};
         my $content = $args{'Content'};
 
@@ -183,6 +183,9 @@ sub build_page {
                 File::Spec->abs2rel( $1 ) . $2;
             }emgx;
         }
+
+        # Add index.html to the end of bare URLs
+        $$content =~ s/(file:\/\/\/.*)\/(['"])/$1\/index.htm$2/mg;
 
         require MT::Template::ContextHandlers;
         my $static_pattern = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
@@ -234,7 +237,7 @@ sub build_file_filter {
         return 1;
     }
 
-    # We are obviously not coming from the PubOffline::PublishOffline 
+    # We are obviously not coming from the MT::Worker::PublishOffline 
     # task. We know this of course because $fi->{offline_batch} will
     # be set otherwise.
     require MT::Request;
