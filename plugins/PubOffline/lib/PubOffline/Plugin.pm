@@ -151,9 +151,17 @@ sub build_page {
         # Time to override the Blog's site path to the user specified site path
         my $batch   = $fi->{'offline_batch'};
         my $target  = $batch->path;
-        #$target = $target . '/' if $target !~ /\/$/;
+        $target = $target . '/' if $target !~ /\/$/;
         my $pattern = $fi->{'__original_site_url'};
         my $content = $args{'Content'};
+
+        # The real blog site path was saved previously; grab it!
+        use MT::Session;
+        my $session = MT::Session::get_unexpired_value(86400, 
+                        { id => 'Puboffline blog '.$batch->blog_id, 
+                          kind => 'po' });
+        my $blog_site_path = $session->data;
+        $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
 
         # First determine if the current file is at the root of the blog
         my $file_path = $fi->file_path;
@@ -166,26 +174,59 @@ sub build_page {
             # found) we need to determine how many folders up we need to go to
             # get back to the root of the blog.
             $$content =~ s{$pattern(.*?)("|')}{
-                ($vol, $dirs_path, $file) = File::Spec->splitpath($1);
+                my $quote  = $2;
+                my $target = $1;
+                
+                # Check if the target is a directory. Compare to the live
+                # published site, because the offline destination may not have
+                # been published yet.
+                if ( -d $blog_site_path.$target ) {
+                    # This is a directory. We can't have a bare directory in
+                    # the offline version, because clicking a link to it will
+                    # just show the contents of the directory.
+                    # So, append "index.html"
+                    $target = $target . '/' if $target !~ /\/$/;
+                    $target .= 'index.html';
+                }
+
+                ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
                 @dirs = File::Spec->splitdir( $dirs_path );
                 unshift @dirs, '..';
                 my $new_dirs_path = File::Spec->catdir( @dirs );
                 my $path = caturl($new_dirs_path, $file);
-                $path . $2;
+                $path . $quote;
             }emgx;
         }
         else {
             # If the file is at the root, we just need to generate a simple
             # relative URL that doesn't need to traverse up a folder at all.
             $$content =~ s{$pattern(.*?)("|')}{
+                my $quote  = $2;
+                my $target = $1;
+
+                # Check if the target is a directory. Compare to the live
+                # published site, because the offline destination may not have
+                # been published yet.
+                if ( -d $blog_site_path.$target ) {
+                    # This is a directory. We can't have a bare directory in
+                    # the offline version, because clicking a link to it will
+                    # just show the contents of the directory.
+                    # So, append "index.html"
+                    if ($target ne '') {
+                        # $target will equal '' if it's the blog URL. We don't
+                        # want to prepend a slash for this. because it'll make
+                        # File::Spec->abs2rel() create a funky URL.
+                        $target = $target . '/' if $target !~ /\/$/;
+                    }
+                    $target .= 'index.html';
+                }
+
                 # abs2rel will convert the path to something relative.
-                # $2 is the single or double quote to be included.
-                File::Spec->abs2rel( $1 ) . $2;
+                # $quote is the single or double quote to be included.
+                File::Spec->abs2rel( $target ) . $quote;
             }emgx;
         }
 
-        # Add index.html to the end of bare URLs
-        $$content =~ s/(file:\/\/\/.*)\/(['"])/$1\/index.htm$2/mg;
 
         require MT::Template::ContextHandlers;
         my $static_pattern = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
