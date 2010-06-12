@@ -14,6 +14,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use MT::FileInfo;
 use MT::PublishOption;
 use MT::Util qw( log_time );
+use File::Copy::Recursive qw(fcopy);
 
 sub keep_exit_status_for { 1 }
 
@@ -59,21 +60,19 @@ sub work {
             next;
         }
 
+        # The real blog site path was saved previously; grab it!
+        use MT::Session;
+        my $session = MT::Session::get_unexpired_value(86400, 
+                        { id => 'Puboffline blog '.$fi->blog_id, 
+                          kind => 'po' });
+        my $blog_site_path = $session->data;
+
         my $batch;
         if ($mt_job->has_column('offline_batch_id')) {
             $batch = MT->model('offline_batch')->load( $mt_job->offline_batch_id );
-            # The blog site path has already been changed to the offline
-            # version, so it can't be grabbed this way.
-            #my $blog = MT->model('blog')->load( $fi->blog_id );
-            #my $sp   = $blog->site_path;
-            # The real blog site path was saved previously; grab it!
-            use MT::Session;
-            my $session = MT::Session::get_unexpired_value(86400, 
-                            { id => 'Puboffline blog '.$batch->blog_id, 
-                              kind => 'po' });
-            my $sp = $session->data;
+
             my $fp = $fi->file_path;
-            $fp =~ s/^$sp(\/)*//;
+            $fp =~ s/^$blog_site_path(\/)*//;
             my $np = File::Spec->catfile($batch->path, $fp);
             # TODO - change $fi record to point to different base directory
             $fi->file_path($np);
@@ -105,8 +104,16 @@ sub work {
             }
         }
 
-#        my $res = $mt->publisher->rebuild_from_fileinfo($fi);
-        my $res = _rebuild_from_fileinfo($fi, $batch->path);
+        my $res;
+        # Copy assets before any content can be published to the offline
+        # folder. This way, assets will be in place and asset tags,
+        # (especially <mt:AssetProperty file_size="1">) can work on them.
+        $res = _copy_assets($blog_site_path, $batch);
+        if ($res) {
+            $job->permanent_failure($res);
+        }
+
+        $res = _rebuild_from_fileinfo($fi, $batch->path);
         if (defined $res) {
             $job->completed();
             $rebuilt++;
@@ -235,5 +242,34 @@ sub _rebuild_from_fileinfo {
     1;
 }
 
+sub _copy_assets {
+    my $blog_site_path = shift;
+    my ($batch) = @_;
+
+    my $iter = MT->model('asset')->load_iter({blog_id => $batch->blog_id, class => '*',});
+    while ( my $asset = $iter->() ) {
+        # We need to rebuild the asset file path as the real, "online"
+        # path, so that the file can be found.
+        my $rel_file_path = $asset->file_path;
+        $rel_file_path =~ s/$blog_site_path//;
+        my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
+
+        my $dest = File::Spec->catfile($batch->path, $rel_file_path);
+        my $copied_asset = fcopy($source,$dest);
+        
+        unless ($copied_asset) {
+            my $errmsg = MT->translate("Error copying assets to target directory: [_1]", $batch->path);
+            MT::TheSchwartz->debug($errmsg);
+            MT->log({
+                ($batch->blog_id ? ( blog_id => $batch->blog_id ) : () ),
+                message => $errmsg,
+                metadata => log_time() . ' ' . $errmsg,
+                category => "publish",
+                level => MT::Log::ERROR(),
+            });
+            return $errmsg;
+        }
+    }
+}
 
 1;
