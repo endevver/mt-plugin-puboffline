@@ -1,7 +1,7 @@
 id: PubOffline
 name: 'Publish Offline'
 description: "This plugin allows administrators to publish a version of their site to another directory on their file system for the express purpose of creating a version of their site offline. It also provides for designers a set of template tags to conditionally display content depending upon whether or not the user is publishing the off or online version of their site."
-version: 0.6
+version: 0.7
 schema_version: 2.1
 
 object_types:

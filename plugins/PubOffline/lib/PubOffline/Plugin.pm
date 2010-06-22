@@ -226,14 +226,15 @@ sub build_page {
             }emgx;
         }
 
-
+        # Static content may be specified with StaticWebPath or
+        # PluginStaticWebPath, so we need to fix those URLs, too.
         require MT::Template::ContextHandlers;
         my $static_pattern = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
         if ( scalar @dirs >= 1 ) {
             # If the file is not at the root, (that is, there were directories
             # found) we need to determine how many folders up we need to go to
             # get back to the root of the blog.
-            $$content =~ s{$static_pattern(.*?)("|')}{
+            $$content =~ s{$static_pattern(.*?)("|'|\))}{
                 ($vol, $dirs_path, $file) = File::Spec->splitpath($1);
                 @dirs = File::Spec->splitdir( $dirs_path );
                 unshift @dirs, 'static';
@@ -246,12 +247,18 @@ sub build_page {
         else {
             # If the file is at the root, we just need to generate a simple
             # relative URL that doesn't need to traverse up a folder at all.
-            $$content =~ s{$pattern(.*?)("|')}{
+            $$content =~ s{$static_pattern(.*?)("|'|\))}{
                 # abs2rel will convert the path to something relative.
                 # $2 is the single or double quote to be included.
-                File::Spec->abs2rel( $1 ) . $2;
+                File::Spec->abs2rel( 'static/'.$1 ) . $2;
             }emgx;
         }
+
+        # The CGIPath is used in mt.js, and may be used for commenting forms,
+        # for example. Changing those to relative URLs doesn't really matter
+        # because it'll point to something that doesn't work: mt-comments.cgi,
+        # for example, isn't copied offline, and even if it was it won't work
+        # because it's not set up!
     }
 }
 
