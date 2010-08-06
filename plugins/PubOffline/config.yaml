@@ -1,8 +1,18 @@
 id: PubOffline
 name: 'Publish Offline'
 description: "This plugin allows administrators to publish a version of their site to another directory on their file system for the express purpose of creating a version of their site offline. It also provides for designers a set of template tags to conditionally display content depending upon whether or not the user is publishing the off or online version of their site."
-version: 0.7
+author_name: Endevver
+author_link: http://endevver.com
+version: 0.7.1
 schema_version: 2.1
+
+settings:
+  output_file_path:
+    scope: blog
+    default: '<mt:BlogSitePath>puboffline/'
+  output_url:
+    scope: blog
+    default: '<mt:BlogURL>puboffline/'
 
 object_types:
   offline_batch: 'PubOffline::OfflineBatch'
@@ -17,7 +27,6 @@ applications:
   cms:
     methods:
       pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue
-#      send_blogs_to_queue: $Send2PQ::Send2PQ::Plugin::send_blogs_to_queue
 
 callbacks:
   build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
@@ -33,15 +42,6 @@ page_actions:
       condition: >
         sub { MT->app->blog; }
 
-#list_actions:
-#  blog:
-#    send_blogs_to_queue:
-#      label: Send to Publish Queue
-#      order: 1011
-#      code: $Send2PQ::Send2PQ::Plugin::send_blogs_to_queue
-#      dialog: 1
-#      permission: publish_post
-
 tasks: $PubOffline::PubOffline::Plugin::load_tasks
 
 task_workers:
@@ -51,6 +51,3 @@ task_workers:
   copy_static_offline:
     label: "Copies static files into an offline folder"
     class: 'MT::Worker::CopyStaticOffline'
-#  copy_asset_offiline:
-#    label: "Copies assets into an offline folder"
-#    class: 'MT::Worker::CopyAssetOffline'

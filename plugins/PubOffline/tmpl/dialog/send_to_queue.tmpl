@@ -54,7 +54,16 @@
         label="<__trans phrase="Output File Path">"
         hint="Output the offline version of this web site to this directory."
         show_hint="1">
-      <input type="text" name="file_path" size="60" value="<$mt:var name="file_path"$>" />
+      <input type="text" name="file_path" size="60" value="<$mt:var name="file_path"$>" style="width: 603px;" />
+    </mtapp:setting>
+
+    <mtapp:setting
+        id="output_url"
+        label_class="top-label"
+        label="<__trans phrase="Output URL">"
+        hint="Enter a URL to the offline version of this web site. (The Output URL is supplied with the notification email.) If the Output File Path does not reference a web accessible directory, leave this field blank."
+        show_hint="1">
+      <input type="text" name="output_url" size="60" value="<$mt:var name="output_url"$>" style="width: 603px;" />
     </mtapp:setting>
 
     <mtapp:setting
@@ -63,7 +72,7 @@
         label="<__trans phrase="Email Address">"
         hint="Send an email to this email address when the process is complete."
         show_hint="1">
-      <input type="text" name="email" value="<$mt:var name="default_email"$>" size="60" />
+      <input type="text" name="email" size="60" value="<$mt:var name="default_email"$>" style="width: 603px;" />
     </mtapp:setting>
 
     <div class="actions-bar">

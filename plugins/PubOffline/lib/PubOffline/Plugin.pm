@@ -29,20 +29,39 @@ sub task_cleanup {
         } else {
             if ($batch->email) {
                 MT->log({ 
-                    message => "It appears the offline publishing batch with an ID of " .$batch->id. " has finished. Notifying " . $batch->email . " and cleaning up.",
+                    message => "It appears the offline publishing batch "
+                        . "with an ID of " .$batch->id. " has finished. "
+                        . "Notifying " . $batch->email . " and cleaning up.",
                     class   => "system",
                     blog_id => $batch->blog->id,
                     level   => MT::Log::INFO()
                 });
-                my $date = format_ts( "%Y-%m-%d", $batch->created_on, $batch->blog, undef );
+                my $date = format_ts( "%Y-%m-%d at %H:%M:%S", $batch->created_on, $batch->blog, undef );
+
+                # Grab the Output URL, if supplied. This way we can provide
+                # a web-accessible link to the offline version, so the user
+                # can easily check out the result.
+                my $plugin = MT->component('PubOffline');
+                my $output_url = $plugin->get_config_value('output_url', 'blog:'.$batch->blog_id);
+                if ( !$output_url ) {
+                    $output_url = $batch->path;
+                }
+
                 require MT::Mail;
-                my %head = ( To => $batch->email, Subject => '['.$batch->blog->name.'] Publishing Batch Finished' );
-                my $body = "The offline publishing batch you initiated on $date has completed. See for yourself:\n\n" . $batch->blog->site_url . "\n\n";
+                my %head = ( 
+                    To      => $batch->email, 
+                    Subject => '['.$batch->blog->name.'] Publishing Batch Finished'
+                );
+                my $body = "The offline publishing batch you initiated on "
+                    . "$date has completed. See for yourself:\n\n" 
+                    . $output_url . "\n\n";
                 MT::Mail->send(\%head, $body)
                     or die MT::Mail->errstr;
             } else {
                 MT->log({
-                    message => "It appears the offline publishing batch with an ID of " .$batch->id. " has finished. Cleaning up.",
+                    message => "It appears the offline publishing batch "
+                        . "with an ID of " .$batch->id. " has finished. "
+                        . "Cleaning up.",
                     class   => "system",
                     blog_id => $batch->blog->id,
                     level   => MT::Log::INFO()
@@ -85,17 +104,43 @@ sub send_to_queue {
 
     return unless $app->blog;
 
+    my $plugin = MT->component('PubOffline');
+
     if ($q->param('create_job')) {
         if (!-e $q->param('file_path') || !-d $q->param('file_path')) {
             $param->{path_nonexist} = 1;
         } elsif (!-w $q->param('file_path')) {
             $param->{path_unwritable} = 1;
         } else {
+            # Save the Output File Path and Ouptut URL so that they can be
+            # re-used in the template, below.
+            $plugin->set_config_value(
+                'output_file_path', 
+                $q->param('file_path'), 
+                'blog:'.$app->blog->id
+            );
+            $plugin->set_config_value(
+                'output_url', 
+                $q->param('output_url'), 
+                'blog:'.$app->blog->id
+            );
             _create_batch( $app->blog->id, $q->param('email'), $q->param('file_path') );
             return $app->load_tmpl( 'dialog/close.tmpl' );
         }
     }
-    $param->{file_path}     = $q->param('file_path') || '';
+    
+    # If the user entered a new path or an unwritable path, that new result
+    # should be returned to them. Otherwise, we want to return the saved path
+    # and URL because that is most likely what the user wants to use again.
+    $param->{file_path} = $q->param('file_path') 
+                            || $plugin->get_config_value(
+                                    'output_file_path', 
+                                    'blog:'.$app->blog->id);
+    $param->{output_url} = $q->param('output_url')
+                            || $plugin->get_config_value(
+                                    'output_url', 
+                                    'blog:'.$app->blog->id);
+
     $param->{batch_exists}  = MT->model('offline_batch')->exist({ blog_id => $app->blog->id });
     $param->{blog_id}       = $app->blog->id;
     $param->{default_email} = $app->user->email;
@@ -156,9 +201,11 @@ sub build_page {
 
         # The real blog site path was saved previously; grab it!
         use MT::Session;
-        my $session = MT::Session::get_unexpired_value(86400, 
-                        { id => 'Puboffline blog '.$batch->blog_id, 
-                          kind => 'po' });
+        my $session = MT::Session::get_unexpired_value(
+                        86400, 
+                        { id   => 'Puboffline blog '.$batch->blog_id, 
+                          kind => 'po' }
+        );
         my $blog_site_path = $session->data;
         $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
 
@@ -169,6 +216,7 @@ sub build_page {
         my @dirs = File::Spec->splitdir( $dirs_path );
 
         if ( scalar @dirs >= 1 ) {
+            #MT->log("$file_path is in a directory: $dirs_path.");
             # If the file is not at the root, (that is, there were directories
             # found) we need to determine how many folders up we need to go to
             # get back to the root of the blog.
@@ -197,11 +245,17 @@ sub build_page {
             }emgx;
         }
         else {
+            #MT->log("$file_path is at the root.");
             # If the file is at the root, we just need to generate a simple
             # relative URL that doesn't need to traverse up a folder at all.
             $$content =~ s{$pattern(.*?)("|')}{
                 my $quote  = $2;
                 my $target = $1;
+
+                # Remove the leading slash, if present. Since this file is at
+                # the root of the site, there should be no URLs starting with
+                # a slash.
+                $target =~ s/^\/(.*)$/$1/;
 
                 # Check if the target is a directory. Compare to the live
                 # published site, because the offline destination may not have
