@@ -21,6 +21,7 @@ On the Create Offline Version screen you are presented with several fields to wo
 
 * Output File Path - This is the path where your files will be published, and should be an absolute path (starting with "`/`"). By default, this is your Blog Site Root with `/puboffline/` appended. The path you enter here will be saved for the next time you wish to publish offline.
 * Output URL - This is a web-accessible location where your offline site is visible, and is included in the notification email Publish Offline sends after your site has been published. By default, this is your Blog Site URL with `/puboffline/` appended. The URL you enter here will be saved for the next time you wish to publish offline. (Note that if you have entered an Output File Path to an area of your server that is _not_ web-accessible, you should leave this field blank so that an invalid URL is not emailed.)
+* Zip Offline Version - Check this checkbox to zip the offline contents for you. This is merely a convenience for users. Note that the `Archive::Zip` Perl module must be installed for this option to appear.
 * Email Address - Enter an email address to be notified when the offline publishing process is complete. By default, the current user's email address is entered here. Leave this field blank if you don't want to receive an email when the process is complete.
 
 After clicking the "Continue" button, the current blog will be sent to the Publish Queue to publish your site. Once the process is complete, the notification email is sent!
