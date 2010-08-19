@@ -66,6 +66,17 @@
       <input type="text" name="output_url" size="60" value="<$mt:var name="output_url"$>" style="width: 603px;" />
     </mtapp:setting>
 
+<mt:If name="archive_zip_installed">
+    <mtapp:setting
+        id="zip_dir"
+        label_class="top-label"
+        label="<__trans phrase="Zip Offline Version">"
+        hint="Zip the contents of the Output File Path">
+      <input type="checkbox" name="zip" id="zip"<mt:If name="zip"> checked="checked"</mt:If> />
+      <label for="zip">Zip the contents of the Output File Path.</label>
+    </mtapp:setting>
+</mt:If>
+
     <mtapp:setting
         id="email"
         label_class="top-label"

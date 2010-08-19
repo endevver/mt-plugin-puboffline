@@ -63,7 +63,7 @@ sub work {
         # The real blog site path was saved previously; grab it!
         use MT::Session;
         my $session = MT::Session::get_unexpired_value(86400, 
-                        { id => 'Puboffline blog '.$fi->blog_id, 
+                        { id   => 'Puboffline blog '.$fi->blog_id, 
                           kind => 'po' });
         my $blog_site_path = $session->data;
 
@@ -248,15 +248,20 @@ sub _copy_assets {
 
     my $iter = MT->model('asset')->load_iter({blog_id => $batch->blog_id, class => '*',});
     while ( my $asset = $iter->() ) {
+        # Give up if the asset doesn't exist on the file system. No point
+        # trying to copy something that doesn't exist!
+        next unless $asset->file_path;
+
         # We need to rebuild the asset file path as the real, "online"
         # path, so that the file can be found.
         my $rel_file_path = $asset->file_path;
         $rel_file_path =~ s/$blog_site_path//;
+
         my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
 
         my $dest = File::Spec->catfile($batch->path, $rel_file_path);
         my $copied_asset = fcopy($source,$dest);
-        
+
         unless ($copied_asset) {
             my $errmsg = MT->translate("Error copying assets to target directory: [_1]", $batch->path);
             MT::TheSchwartz->debug($errmsg);
