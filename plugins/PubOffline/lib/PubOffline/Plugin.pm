@@ -28,8 +28,10 @@ sub task_cleanup {
             # send warning if it has been on the queue too long
         } else {
             my $plugin = MT->component('PubOffline');
+            my $zip_pref = $plugin->get_config_value('zip', 'blog:'.$batch->blog_id);
             my $zip_message;
-            if ( $plugin->get_config_value('zip', 'blog:'.$batch->blog_id) ) {
+            if ($zip_pref) {
+                # The $zip_message contains both a success and fail notice.
                 $zip_message = _zip_offline($batch);
             }
             # Notify the specified user that we're done
@@ -42,13 +44,46 @@ sub task_cleanup {
                     blog_id => $batch->blog->id,
                     level   => MT::Log::INFO()
                 });
-                my $date = format_ts( "%Y-%m-%d at %H:%M:%S", $batch->created_on, $batch->blog, undef );
+                my $date = format_ts( 
+                    "%Y-%m-%d at %H:%M:%S", 
+                    $batch->created_on, 
+                    $batch->blog, 
+                    undef 
+                );
 
                 # Grab the Output URL, if supplied. This way we can provide
                 # a web-accessible link to the offline version, so the user
                 # can easily check out the result.
-                my $output_url = $plugin->get_config_value('output_url', 'blog:'.$batch->blog_id);
-                if ( !$output_url ) {
+                my $output_url = $plugin->get_config_value(
+                    'output_url', 
+                    'blog:'.$batch->blog_id
+                );
+                # If a URL was provided and a zip archive was created, we 
+                # want to supply an output URL that correctly points to the 
+                # sub-folder with the offline site.
+                if ( $output_url && $zip_pref) {
+                    # Add a trailing slash if there isn't already one.
+                    $output_url .= '/' unless $output_url =~ m!/$!;
+                    # Assemble the subdirectory name.
+                    my $blog = MT->model('blog')->load($batch->blog_id);
+                    my $blog_name = dirify($blog->name);
+                    $output_url .= $blog_name;
+                    # Include a note about the zip in the email.
+                    if ($zip_message) {
+                        # Zip archive successfully created
+                        $zip_message = "The zip archive can be found at "
+                            . $output_url . "_offline.zip.\n\n";
+                    }
+                    else {
+                        # Zipping failed
+                        $zip_message = "The zip archive could not be "
+                            . "written to " . $batch->path . $blog_name
+                            . "_offline.zip. Check permissions before "
+                            . "trying again.\n\n";
+                    }
+                }
+                # No URL was provided, so just return the file path.
+                if (!$output_url) {
                     $output_url = $batch->path;
                 }
 
@@ -111,7 +146,18 @@ sub _zip_offline {
     unlink($zip_dest);
 
     # Finally, write the zip file to disk.
-    unless ( $zip->writeToFileNamed($zip_dest) == AZ_OK ) {
+    if ( $zip->writeToFileNamed($zip_dest) == AZ_OK ) {
+        # Success!
+        MT->log({ 
+            message => "The offline publishing batch with an ID of " 
+                . $batch->id . " createe a zip archive at $zip_dest.",
+            class   => "system",
+            blog_id => $batch->blog->id,
+            level   => MT::Log::INFO()
+        });
+        return 1;
+    }
+    else {
         # Failed to write!
         MT->log({ 
             message => "The offline publishing batch with an ID of " 
@@ -123,13 +169,8 @@ sub _zip_offline {
             blog_id => $batch->blog->id,
             level   => MT::Log::ERROR()
         });
-        # Include a note with the email.
-        return "The zip archive could not be written to $zip_dest. Check "
-            . "permissions before trying again.\n\n";
+        return 0;
     }
-
-    # An empty message is fine because we don't really need to report success.
-    return '';
 }
 
 sub tag_is_offline {
@@ -199,6 +240,7 @@ sub send_to_queue {
                     dirify($app->blog->name)
                 );
             }
+
             _create_batch( 
                 $app->blog->id, 
                 $q->param('email'), 
@@ -247,7 +289,8 @@ sub _create_batch {
     $batch->save
         or return $app->error(
             $app->translate(
-                "Unable to create a offline publishing batch and send content to the publish queue",
+                "Unable to create a offline publishing batch and send "
+                . "content to the publish queue",
                 $batch->errstr
             )
         );
@@ -261,7 +304,8 @@ sub _create_batch {
     $pub->rebuild( BlogID => $blog_id );
     _create_copy_static_job( $batch );
     
-    # Save the "real" blog site path so that it can be used later to copy the assets.
+    # Save the "real" blog site path so that it can be used later to copy
+    # the assets.
     use MT::Session;
     my $session = MT::Session->new;
     $session->id('PubOffline blog '.$blog_id);
@@ -272,8 +316,8 @@ sub _create_batch {
     $session->save;
 }
 
-# This is invoked just before the file is written. We use this to re-write all URLs
-# to map http://... to file://...
+# This is invoked just before the file is written. We use this to re-write
+# all URLs to map http://... to file://...
 sub build_page {
     my ( $cb, %args ) = @_;
     my $fi = $args{'file_info'};
