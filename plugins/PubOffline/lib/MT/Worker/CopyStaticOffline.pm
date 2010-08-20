@@ -57,6 +57,7 @@ sub work {
             $job->completed();
             next;
         }
+        
         $File::Copy::Recursive::CopyLink = 1;
         my $source = MT->instance->config('StaticFilePath');
         my $target = File::Spec->catfile($batch->path,"static");

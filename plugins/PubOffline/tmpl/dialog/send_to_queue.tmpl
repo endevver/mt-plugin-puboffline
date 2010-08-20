@@ -77,6 +77,14 @@
 </mt:If>
 
     <mtapp:setting
+        id="date"
+        label_class="top-label"
+        label="<__trans phrase="Include Date Identifier">">
+      <input type="checkbox" name="date" id="date"<mt:If name="date"> checked="checked"</mt:If> />
+      <label for="date">Append a date identifier to the offline version parent folder.</label>
+    </mtapp:setting>
+
+    <mtapp:setting
         id="email"
         label_class="top-label"
         label="<__trans phrase="Email Address">"

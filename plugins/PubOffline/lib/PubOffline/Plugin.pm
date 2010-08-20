@@ -29,7 +29,7 @@ sub task_cleanup {
         } else {
             my $plugin = MT->component('PubOffline');
             my $zip_pref = $plugin->get_config_value('zip', 'blog:'.$batch->blog_id);
-            my $zip_message;
+            my $zip_message = '';
             if ($zip_pref) {
                 # The $zip_message contains both a success and fail notice.
                 $zip_message = _zip_offline($batch);
@@ -61,29 +61,46 @@ sub task_cleanup {
                 # If a URL was provided and a zip archive was created, we 
                 # want to supply an output URL that correctly points to the 
                 # sub-folder with the offline site.
-                if ( $output_url && $zip_pref) {
+                if ($output_url) {
                     # Add a trailing slash if there isn't already one.
                     $output_url .= '/' unless $output_url =~ m!/$!;
-                    # Assemble the subdirectory name.
-                    my $blog = MT->model('blog')->load($batch->blog_id);
-                    my $blog_name = dirify($blog->name);
-                    $output_url .= $blog_name;
-                    # Include a note about the zip in the email.
-                    if ($zip_message) {
-                        # Zip archive successfully created
-                        $zip_message = "The zip archive can be found at "
-                            . $output_url . "_offline.zip.\n\n";
+                    # Prepend an underscore as a separator
+                    my $folder_date = '';
+                    if ( $plugin->get_config_value('date', 'blog:'.$batch->blog_id) ) {
+                        $folder_date = '_' . format_ts( 
+                            "%Y%m%d_%H%M%S", 
+                            $batch->created_on, 
+                            $batch->blog, 
+                            undef 
+                        );
+                    }
+                    my $blog_name = dirify($batch->blog->name);
+                    # The output URL needs to be handled specially depending
+                    # on if a zip was requested.
+                    if ($zip_pref) {
+                        # Assemble the subdirectory name.
+                        $output_url .= $blog_name.$folder_date.'/'.$blog_name;
+                        # Include a note about the zip in the email.
+                        if ($zip_message) {
+                            # Zip archive successfully created
+                            $zip_message = "The zip archive can be found at "
+                                . $output_url . "_offline.zip.\n\n";
+                        }
+                        else {
+                            # Zipping failed
+                            $zip_message = "The zip archive could not be "
+                                . "written to " . $batch->path . $blog_name
+                                . "_offline.zip. Check permissions before "
+                                . "trying again.\n\n";
+                        }
                     }
                     else {
-                        # Zipping failed
-                        $zip_message = "The zip archive could not be "
-                            . "written to " . $batch->path . $blog_name
-                            . "_offline.zip. Check permissions before "
-                            . "trying again.\n\n";
+                        # A zip file was not needed.
+                        $output_url .= $blog_name.$folder_date,
                     }
                 }
-                # No URL was provided, so just return the file path.
-                if (!$output_url) {
+                else {
+                    # No URL was provided, so just return the file path.
                     $output_url = $batch->path;
                 }
 
@@ -229,22 +246,16 @@ sub send_to_queue {
                 $q->param('zip') || '0', # If unchecked, record "0"
                 'blog:'.$app->blog->id
             );
+            $plugin->set_config_value(
+                'date', 
+                $q->param('date') || '0', # If unchecked, record "0"
+                'blog:'.$app->blog->id
+            );
             
-            # If the offline version should be zipped, then the site should
-            # be published into a folder inside of the specified path. That
-            # way the zip can be found at the Output File Path URL.
-            my $file_path = $q->param('file_path');
-            if ( $q->param('zip') ) {
-                $file_path = File::Spec->catfile(
-                    $file_path, 
-                    dirify($app->blog->name)
-                );
-            }
-
             _create_batch( 
                 $app->blog->id, 
                 $q->param('email'), 
-                $file_path, 
+                $q->param('file_path'), 
             );
             return $app->load_tmpl( 'dialog/close.tmpl' );
         }
@@ -265,6 +276,10 @@ sub send_to_queue {
                             || $plugin->get_config_value(
                                     'zip', 
                                     'blog:'.$app->blog->id);
+    $param->{date} = $q->param('date')
+                            || $plugin->get_config_value(
+                                    'date', 
+                                    'blog:'.$app->blog->id);
     # Only show the zip option if Archive::Zip is available.
     $param->{archive_zip_installed} =  eval "require Archive::Zip;" ? 1 : 0;
     $param->{batch_exists}  = MT->model('offline_batch')->exist(
@@ -282,10 +297,11 @@ sub _create_batch {
     # Skip this blog if it's already marked to republish.
     return if ( MT->model('offline_batch')->exist({ blog_id => $blog_id }) );
 
+
     my $batch = MT->model('offline_batch')->new;
     $batch->blog_id( $blog_id );
     $batch->email( $email );
-    $batch->path( $path );
+    #$batch->path( $path );
     $batch->save
         or return $app->error(
             $app->translate(
@@ -294,6 +310,37 @@ sub _create_batch {
                 $batch->errstr
             )
         );
+
+    # Now that the batch has been saved, we can grab the created_on time
+    # and use that to build a path.
+    my $date = '';
+    if ( $app->param('date') ) {
+        # Prepend an underscore as a separator
+        $date = '_' . format_ts( 
+            "%Y%m%d_%H%M%S", 
+            $batch->created_on, 
+            $batch->blog, 
+            undef 
+        );
+    }
+    if ( $app->param('zip') ) {
+        # If a zip is needed, include a subdir of the blog name.
+        $path = File::Spec->catfile(
+            $path, 
+            dirify($app->blog->name).$date,
+            dirify($app->blog->name),
+        );
+    }
+    else {
+        $path = File::Spec->catfile(
+            $path, 
+            dirify($app->blog->name).$date,
+        );
+    }
+    # Finally, save the $path, which includes a dated folder, if requested.
+    $batch->path( $path );
+    $batch->save;
+    
 
     require MT::Request;
     my $r = MT::Request->instance();
