@@ -83,8 +83,8 @@ sub task_cleanup {
                         # Include a note about the zip in the email.
                         if ($zip_message) {
                             # Zip archive successfully created
-                            $zip_message = "The zip archive can be found at "
-                                . $output_url . "_offline.zip.\n\n";
+                            $zip_message = "Download the zip archive of the offline version at:\n\n"
+                                . $output_url . "_offline.zip\n\n";
                         }
                         else {
                             # Zipping failed
@@ -110,7 +110,8 @@ sub task_cleanup {
                     Subject => '['.$batch->blog->name.'] Publishing Batch Finished'
                 );
                 my $body = "The offline publishing batch you initiated on "
-                    . "$date has completed. See for yourself:\n\n" 
+                    . "$date has completed.\n\n"
+                    . "View the offline version in a web browser at:\n\n"
                     . $output_url . "\n\n" . $zip_message;
                 MT::Mail->send(\%head, $body)
                     or die MT::Mail->errstr;
