@@ -168,7 +168,7 @@ sub _zip_offline {
         # Success!
         MT->log({ 
             message => "The offline publishing batch with an ID of " 
-                . $batch->id . " createe a zip archive at $zip_dest.",
+                . $batch->id . " created a zip archive at $zip_dest.",
             class   => "system",
             blog_id => $batch->blog->id,
             level   => MT::Log::INFO()
