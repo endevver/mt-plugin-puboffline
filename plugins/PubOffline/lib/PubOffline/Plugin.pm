@@ -107,7 +107,8 @@ sub task_cleanup {
                 require MT::Mail;
                 my %head = ( 
                     To      => $batch->email, 
-                    Subject => '['.$batch->blog->name.'] Publishing Batch Finished'
+                    Subject => '[' . $batch->blog->name 
+                        . '] Offline Publishing Batch Finished',
                 );
                 my $body = "The offline publishing batch you initiated on "
                     . "$date has completed.\n\n"
@@ -558,7 +559,7 @@ sub _create_publish_job {
     $job->coalesce( ( $fi->blog_id || 0 ) . ':' . $$ . ':' . $priority . ':' . ( time - ( time % 10 ) ) );
     $job->save or MT->log({
         blog_id => $fi->blog_id,
-        message => "Could not queue offline publish job: " . $job->errstr
+        message => "PubOffline: could not queue offline publish job: " . $job->errstr
     });
 }
 
@@ -581,7 +582,7 @@ sub _create_copy_static_job {
     $job->coalesce( ( $batch->blog_id || 0 ) . ':' . $$ . ':' . 9 . ':' . ( time - ( time % 10 ) ) );
     $job->save or MT->log({
         blog_id => $batch->blog_id,
-        message => "Could not queue copy static job: " . $job->errstr
+        message => "PubOffline: could not queue copy static job: " . $job->errstr
     });
 }
 

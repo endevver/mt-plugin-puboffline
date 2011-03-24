@@ -66,7 +66,10 @@ sub work {
         if (defined $copied && $copied > 0) {
             $job->completed();
         } else {
-            my $errmsg = $mt->translate("Error copying static files to target directory: [_1]", $target);
+            my $errmsg = $mt->translate(
+                "PubOffline: Error copying static files to target directory: [_1]", 
+                $target
+            );
             MT::TheSchwartz->debug($errmsg);
             $job->permanent_failure($errmsg);
             require MT::Log;

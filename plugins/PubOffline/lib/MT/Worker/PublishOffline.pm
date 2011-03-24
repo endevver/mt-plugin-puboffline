@@ -77,7 +77,7 @@ sub work {
             # TODO - change $fi record to point to different base directory
             $fi->file_path($np);
         } else {
-            MT->log( "Apparently, the job does not have the offline_batch_id column" );
+            MT->log( "PubOffline: Apparently, the job does not have the offline_batch_id column" );
         }
 
         my $priority = $job->priority ? ", priority " . $job->priority : "";
@@ -120,7 +120,7 @@ sub work {
         } else {
             my $error = $mt->publisher->errstr;
             my $errmsg = $mt->translate(
-                "Error rebuilding file [_1]" . $fi->file_path . ": " . $error
+                "PubOffline: Error rebuilding file [_1]" . $fi->file_path . ": " . $error
             );
             MT::TheSchwartz->debug($errmsg);
             $job->permanent_failure($errmsg);
@@ -279,7 +279,7 @@ sub _copy_assets {
 
         if (!$copied_asset) {
             my $errmsg = MT->translate(
-                "Error copying asset ([_1]) to target directory: [_2]", 
+                "PubOffline: Error copying asset ([_1]) to target directory: [_2]", 
                 $source, 
                 $dest
             );
