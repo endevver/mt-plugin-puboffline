@@ -6,6 +6,25 @@ author_link: http://endevver.com
 version: 0.8
 schema_version: 3
 
+object_types:
+  offline_batch: 'PubOffline::OfflineBatch'
+  ts_job:
+    offline_batch_id: integer
+
+callbacks:
+  build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
+  build_page: $PubOffline::PubOffline::Plugin::build_page
+
+  tasks: $PubOffline::PubOffline::Plugin::load_tasks
+
+task_workers:
+  publish_offline:
+    label: "Publishes an offline version of content"
+    class: 'MT::Worker::PublishOffline'
+  copy_static_offline:
+    label: "Copies static files into an offline folder"
+    class: 'MT::Worker::CopyStaticOffline'
+
 settings:
   output_file_path:
     scope: blog
@@ -20,11 +39,6 @@ settings:
     scope: blog
     default: 0
 
-object_types:
-  offline_batch: 'PubOffline::OfflineBatch'
-  ts_job:
-    offline_batch_id: integer
-
 tags:
   block:
     IsOfflineMode?: $PubOffline::PubOffline::Plugin::tag_is_offline
@@ -33,10 +47,6 @@ applications:
   cms:
     methods:
       pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue
-
-callbacks:
-  build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
-  build_page: $PubOffline::PubOffline::Plugin::build_page
 
 page_actions:
   list_templates:
@@ -48,12 +58,3 @@ page_actions:
       condition: >
         sub { MT->app->blog; }
 
-tasks: $PubOffline::PubOffline::Plugin::load_tasks
-
-task_workers:
-  publish_offline:
-    label: "Publishes an offline version of content"
-    class: 'MT::Worker::PublishOffline'
-  copy_static_offline:
-    label: "Copies static files into an offline folder"
-    class: 'MT::Worker::CopyStaticOffline'
