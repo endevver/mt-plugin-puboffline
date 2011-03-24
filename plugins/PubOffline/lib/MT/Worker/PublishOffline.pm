@@ -279,7 +279,8 @@ sub _copy_assets {
 
         if (!$copied_asset) {
             my $errmsg = MT->translate(
-                "PubOffline: Error copying asset ([_1]) to target directory: [_2]", 
+                "PubOffline: Error copying asset ID [_1] ([_2]) to target directory: [_3]", 
+                $asset->id,
                 $source, 
                 $dest
             );
@@ -291,7 +292,6 @@ sub _copy_assets {
                 category => "publish",
                 level => MT::Log::ERROR(),
             });
-            return $errmsg;
         }
     }
 

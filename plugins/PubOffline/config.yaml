@@ -15,7 +15,7 @@ callbacks:
   build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
   build_page: $PubOffline::PubOffline::Plugin::build_page
 
-  tasks: $PubOffline::PubOffline::Plugin::load_tasks
+tasks: $PubOffline::PubOffline::Plugin::load_tasks
 
 task_workers:
   publish_offline:
