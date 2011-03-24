@@ -47,12 +47,6 @@ page_actions:
       permission: publish_post
       condition: >
         sub { MT->app->blog; }
-  theme_dashboard:
-    pub_offline:
-      label: 'Publish Offline Version'
-      order: 300
-      dialog: pub_offline
-      permission: publish_post
 
 tasks: $PubOffline::PubOffline::Plugin::load_tasks
 
