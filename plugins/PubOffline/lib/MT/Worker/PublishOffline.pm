@@ -104,16 +104,12 @@ sub work {
             }
         }
 
-        my $res;
         # Copy assets before any content can be published to the offline
         # folder. This way, assets will be in place and asset tags,
         # (especially <mt:AssetProperty file_size="1">) can work on them.
-        $res = _copy_assets($blog_site_path, $batch);
-        if ($res) {
-            $job->permanent_failure($res);
-        }
+        _copy_assets($blog_site_path, $batch);
 
-        $res = _rebuild_from_fileinfo($fi, $batch->path);
+        my $res = _rebuild_from_fileinfo($fi, $batch->path);
         if (defined $res) {
             $job->completed();
             $rebuilt++;
