@@ -513,6 +513,10 @@ sub build_file_filter {
         $args{'file_info'}->{'__original_site_url'} = $url;
         $args{'Blog'}->site_path($batch->path);
         $args{'Context'}->stash('__offline_mode',1);
+        MT->log({
+            blog_id => $args{'Blog'}->id,
+            message => 'Publishing file to: '.$args{'File'},
+        });
         # Return 1 and tell MT to physically publish the file!
         return 1;
     }
