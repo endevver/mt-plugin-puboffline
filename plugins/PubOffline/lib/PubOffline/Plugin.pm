@@ -200,7 +200,7 @@ sub tag_is_offline {
 #sub send_blogs_to_queue {
 #    my $app = shift;
 #    my ($param) = @_;
-#    my $q       = $app->{query};
+#    my $q       = $app->can('query') ? $app->query : $app->param;
 #    $param ||= {};
 #    if ( $q->param('create_job') ) {
 #        my @blog_ids = split(/,/, $q->param('blog_ids') );
@@ -217,7 +217,7 @@ sub tag_is_offline {
 sub send_to_queue {
     my $app = shift;
     my ($param) = @_;
-    my $q       = $app->{query};
+    my $q       = $app->can('query') ? $app->query : $app->param;
     $param ||= {};
 
     return unless $app->blog;
@@ -225,23 +225,23 @@ sub send_to_queue {
     my $plugin = MT->component('PubOffline');
 
     if ($q->param('create_job')) {
-        if (!-e $q->param('file_path') || !-d $q->param('file_path')) {
-            $param->{path_nonexist} = 1;
-        } elsif (!-w $q->param('file_path')) {
-            $param->{path_unwritable} = 1;
-        } else {
+#        if (!-e $q->param('file_path') || !-d $q->param('file_path')) {
+#            $param->{path_nonexist} = 1;
+#        } elsif (!-w $q->param('file_path')) {
+#            $param->{path_unwritable} = 1;
+#        } else {
             # Save the Output File Path, Ouptut URL and Zip field settings
             # so that they can be re-used in the template, below.
-            $plugin->set_config_value(
-                'output_file_path', 
-                $q->param('file_path'), 
-                'blog:'.$app->blog->id
-            );
-            $plugin->set_config_value(
-                'output_url', 
-                $q->param('output_url'), 
-                'blog:'.$app->blog->id
-            );
+#            $plugin->set_config_value(
+#                'output_file_path', 
+#                $q->param('file_path'), 
+#                'blog:'.$app->blog->id
+#            );
+#            $plugin->set_config_value(
+#                'output_url', 
+#                $q->param('output_url'), 
+#                'blog:'.$app->blog->id
+#            );
             $plugin->set_config_value(
                 'zip', 
                 $q->param('zip') || '0', # If unchecked, record "0"
@@ -256,23 +256,23 @@ sub send_to_queue {
             _create_batch( 
                 $app->blog->id, 
                 $q->param('email'), 
-                $q->param('file_path'), 
+#                $q->param('file_path'), 
             );
             return $app->load_tmpl( 'dialog/close.tmpl' );
-        }
+#        }
     }
     
     # If the user entered a new path or an unwritable path, that new result
     # should be returned to them. Otherwise, we want to return the saved path
     # and URL because that is most likely what the user wants to use again.
-    $param->{file_path} = $q->param('file_path') 
-                            || $plugin->get_config_value(
-                                    'output_file_path', 
-                                    'blog:'.$app->blog->id);
-    $param->{output_url} = $q->param('output_url')
-                            || $plugin->get_config_value(
-                                    'output_url', 
-                                    'blog:'.$app->blog->id);
+ #   $param->{file_path} = $q->param('file_path') 
+ #                           || $plugin->get_config_value(
+ #                                   'output_file_path', 
+ #                                   'blog:'.$app->blog->id);
+ #   $param->{output_url} = $q->param('output_url')
+ #                           || $plugin->get_config_value(
+ #                                   'output_url', 
+ #                                   'blog:'.$app->blog->id);
     $param->{zip} = $q->param('zip')
                             || $plugin->get_config_value(
                                     'zip', 
@@ -292,12 +292,12 @@ sub send_to_queue {
 }
 
 sub _create_batch {
-    my ($blog_id, $email, $path) = @_;
+#    my ($blog_id, $email, $path) = @_;
+    my ($blog_id, $email) = @_;
     my $app = MT->instance;
 
     # Skip this blog if it's already marked to republish.
     return if ( MT->model('offline_batch')->exist({ blog_id => $blog_id }) );
-
 
     my $batch = MT->model('offline_batch')->new;
     $batch->blog_id( $blog_id );
@@ -306,62 +306,75 @@ sub _create_batch {
     $batch->save
         or return $app->error(
             $app->translate(
-                "Unable to create a offline publishing batch and send "
-                . "content to the publish queue",
+                "Unable to create a offline publishing batch.",
                 $batch->errstr
             )
         );
 
-    # Now that the batch has been saved, we can grab the created_on time
-    # and use that to build a path.
-    my $date = '';
-    if ( $app->param('date') ) {
-        # Prepend an underscore as a separator
-        $date = '_' . format_ts( 
-            "%Y%m%d_%H%M%S", 
-            $batch->created_on, 
-            $batch->blog, 
-            undef 
-        );
-    }
-    if ( $app->param('zip') ) {
-        # If a zip is needed, include a subdir of the blog name.
-        $path = File::Spec->catfile(
-            $path, 
-            dirify($app->blog->name).$date,
-            dirify($app->blog->name),
-        );
-    }
-    else {
-        $path = File::Spec->catfile(
-            $path, 
-            dirify($app->blog->name).$date,
-        );
-    }
+# Byrne - we don't need this because we do not customize the name of the 
+# directory we copy or pubishing into anymore. 
+#    # Now that the batch has been saved, we can grab the created_on time
+#    # and use that to build a path.
+#    my $date = '';
+#    if ( $app->param('date') ) {
+#        # Prepend an underscore as a separator
+#        $date = '_' . format_ts( 
+#            "%Y%m%d_%H%M%S", 
+#            $batch->created_on, 
+#            $batch->blog, 
+#            undef 
+#        );
+#    }
+#    if ( $app->param('zip') ) {
+#        # If a zip is needed, include a subdir of the blog name.
+#        $path = File::Spec->catfile(
+#            $path, 
+#            dirify($app->blog->name).$date,
+#            dirify($app->blog->name),
+#        );
+#    }
+#    else {
+#        $path = File::Spec->catfile(
+#            $path, 
+#            dirify($app->blog->name).$date,
+#        );
+#    }
     # Finally, save the $path, which includes a dated folder, if requested.
-    $batch->path( $path );
-    $batch->save;
+    # Byrne - this is no longer needed since the path we copy to is always the
+    # same.
+    #$batch->path( $path );
+    #$batch->save;
     
 
-    require MT::Request;
-    my $r = MT::Request->instance();
-    $r->stash('offline_batch',$batch);
-
-    require MT::WeblogPublisher;
-    my $pub = MT::WeblogPublisher->new;
-    $pub->rebuild( BlogID => $blog_id );
-    _create_copy_static_job( $batch );
     
+# Byrne - we don't need this any more because we don't need to tell
+# build_page that this is a pub offline request. Files are maintained
+# on the file system in more real time.
+#    require MT::Request;
+#    my $r = MT::Request->instance();
+#    $r->stash('offline_batch',$batch);
+
+# Byrne - we don't need this because we are not rebuilding anything 
+# through this call back. All we need to do is initiate the offline 
+# packaging process.
+#    require MT::WeblogPublisher;
+#    my $pub = MT::WeblogPublisher->new;
+#    $pub->rebuild( BlogID => $blog_id );
+
+   _create_copy_static_job( $batch );
+    
+# Byrne - we don't need this because the "real" site path is no longer 
+# clobbered by our code. 
     # Save the "real" blog site path so that it can be used later to copy
     # the assets.
-    use MT::Session;
-    my $session = MT::Session->new;
-    $session->id('PubOffline blog '.$blog_id);
-    $session->kind('po');
-    my $blog = MT->model('blog')->load($blog_id);
-    $session->data( $blog->site_path );
-    $session->start(time());
-    $session->save;
+#    use MT::Session;
+#    my $session = MT::Session->new;
+#    $session->id('PubOffline blog '.$blog_id);
+#    $session->kind('po');
+#    my $blog = MT->model('blog')->load($blog_id);
+#    $session->data( $blog->site_path );
+#    $session->start(time());
+#    $session->save;
 }
 
 # This is invoked just before the file is written. We use this to re-write
@@ -369,22 +382,27 @@ sub _create_batch {
 sub build_page {
     my ( $cb, %args ) = @_;
     my $fi = $args{'file_info'};
-    if ($fi->{'offline_batch'}) {
+    if ($fi->{'is_offline_file'}) {
         # Time to override the Blog's site path to the user specified site path
-        my $batch   = $fi->{'offline_batch'};
-        my $target  = $batch->path;
+        my $plugin = MT->component('PubOffline');
+        my $new_site_path = $plugin->get_config_value('output_file_path', 
+                                                      'blog:'.$fi->blog_id);
+
+        my $target  = $new_site_path;
         $target = $target . '/' if $target !~ /\/$/;
+        
         my $pattern = $fi->{'__original_site_url'};
         my $content = $args{'Content'};
 
         # The real blog site path was saved previously; grab it!
-        use MT::Session;
-        my $session = MT::Session::get_unexpired_value(
-            86400, 
-            { id   => 'Puboffline blog '.$batch->blog_id, 
-              kind => 'po' }
-        );
-        my $blog_site_path = $session->data;
+#        use MT::Session;
+#        my $session = MT::Session::get_unexpired_value(
+#            86400, 
+#            { id   => 'Puboffline blog '.$batch->blog_id, 
+#              kind => 'po' }
+#        );
+#        my $blog_site_path = $session->data;
+        my $blog_site_path = $args{'Blog'}->site_path;
         $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
 
         # First determine if the current file is at the root of the blog
@@ -393,8 +411,21 @@ sub build_page {
         my ($vol, $dirs_path, $file) = File::Spec->splitpath($file_path);
         my @dirs = File::Spec->splitdir( $dirs_path );
 
+        
+        # The voodoo below constructs the relative path back to the root from the current
+        # file. This is used in building a path to static files, as well as to other 
+        # files in the web site/blog. Here is how it works. 
+        # a) Take a string to the current file. This should have the http://host removed.
+        # b) Extract the directories from that path.
+        my @reldirs;
+        my @dirs_to_file = File::Spec->splitdir( $file_path );
+        my $filename = pop @dirs_to_file;
+        # d) Replace each directory with a '..' (the relative equivalent)
+        foreach (@dirs_to_file) { unshift @reldirs,'..'; }
+        # By this point @reldirs holds the relative directory components back to the root
+
         if ( scalar @dirs >= 1 ) {
-            #MT->log("$file_path is in a directory: $dirs_path.");
+            print STDERR "$file_path is in a directory: $dirs_path.\n";
             # If the file is not at the root, (that is, there were directories
             # found) we need to determine how many folders up we need to go to
             # get back to the root of the blog.
@@ -416,14 +447,15 @@ sub build_page {
 
                 ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
                 @dirs = File::Spec->splitdir( $dirs_path );
-                unshift @dirs, '..';
-                my $new_dirs_path = File::Spec->catdir( @dirs );
+#                unshift @dirs, '..';
+                my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
                 my $path = caturl($new_dirs_path, $file);
+                print STDERR "Path will be $path\n";
                 $path . $quote;
             }emgx;
         }
         else {
-            #MT->log("$file_path is at the root.");
+            print STDERR "$file_path is at the root.\n";
             # If the file is at the root, we just need to generate a simple
             # relative URL that doesn't need to traverse up a folder at all.
             $$content =~ s{$pattern(.*?)("|')}{
@@ -461,28 +493,31 @@ sub build_page {
         # Static content may be specified with StaticWebPath or
         # PluginStaticWebPath, so we need to fix those URLs, too.
         require MT::Template::ContextHandlers;
-        my $static_pattern = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
+        my ($static_pattern,$static_pattern_a,$static_pattern_b);
+        $static_pattern_a = $static_pattern_b = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
+        $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
+        $static_pattern = "($static_pattern_a|$static_pattern_b)";
         if ( scalar @dirs >= 1 ) {
             # If the file is not at the root, (that is, there were directories
             # found) we need to determine how many folders up we need to go to
             # get back to the root of the blog.
-            $$content =~ s{$static_pattern(.*?)("|'|\))}{
-                ($vol, $dirs_path, $file) = File::Spec->splitpath($1);
+#            print STDERR "Static path needs to be made relative.\n";
+            $$content =~ s{$static_pattern([^"'\)]*)(["'\)])}{
+                ($vol, $dirs_path, $file) = File::Spec->splitpath($2);
                 @dirs = File::Spec->splitdir( $dirs_path );
-                unshift @dirs, 'static';
-                unshift @dirs, '..';
-                my $new_dirs_path = File::Spec->catdir( @dirs );
-                my $path = caturl($new_dirs_path, $file);
-                $path . $2;
+                my $path = caturl(@reldirs, 'static', @dirs, $file);
+                $path . $3;
             }emgx;
         }
         else {
             # If the file is at the root, we just need to generate a simple
             # relative URL that doesn't need to traverse up a folder at all.
-            $$content =~ s{$static_pattern(.*?)("|'|\))}{
+#            print STDERR "File is at root\n";
+            $$content =~ s{$static_pattern([^"'\)]*)}{
                 # abs2rel will convert the path to something relative.
                 # $2 is the single or double quote to be included.
-                File::Spec->abs2rel( 'static/'.$1 ) . $2;
+                #File::Spec->abs2rel( 'static/'.$1 ) . $2;
+                File::Spec->abs2rel( 'static/'.$2 ) . $3;
             }emgx;
         }
 
@@ -500,33 +535,39 @@ sub build_file_filter {
     my ( $cb, %args ) = @_;
     my $fi = $args{'file_info'};
 
-    # Prevents requeuing. In other words it tells the Worker making a call to
-    # this filter that the decision to publish this file via the publish queue
-    # has already been made. Therefore we need to short circuit this callback.
-    # This is our opportunity therefore to modify the template context before
-    # returning!
-    if ($fi->{'offline_batch'}) {
+    # This first block of code checks to see if the file being republished is coming
+    # from the MT::Worker::PubOffline worker. If it is, then we know that we need to 
+    # publish this asynchronously. We also know we need to tweak the context a bit
+    # to "trick" the system into publishing the file to a different destination 
+    # (e.g. the offline folder).
+    if ($fi->{'is_offline_file'}) {
+        my $plugin = MT->component('PubOffline');
+        my $site_path = $plugin->get_config_value('output_file_path', 'blog:'.$fi->blog_id);
+
         # Time to override the Blog's site path to the user specified site path
-        my $batch = $fi->{'offline_batch'};
         my $url   = $args{'Blog'}->site_url;
         $args{'file_info'}->{'__original_site_url'} = $url;
-        $args{'Blog'}->site_path($batch->path);
+        $args{'Blog'}->site_path($site_path);
         $args{'Context'}->stash('__offline_mode',1);
         # Return 1 and tell MT to physically publish the file!
         return 1;
     }
 
-    # We are obviously not coming from the MT::Worker::PublishOffline 
-    # task. We know this of course because $fi->{offline_batch} will
-    # be set otherwise.
-    require MT::Request;
-    my $r = MT::Request->instance();
-    my $batch = $r->stash('offline_batch');
-    unless ($batch) {
-        # Batch does not exist, so assume we can publish. Let other 
-        # build_file_filters determine course of action.
-        return 1;
-    }
+# This code is not needed because if the request is not coming from the worker,
+# then it is coming through the regular course of publishing, in which case,
+# we need to create a job for publishing this file via PubOffline in addition to
+# whatever other file is being published.
+#    # We are obviously not coming from the MT::Worker::PublishOffline 
+#    # task. We know this of course because $fi->{offline_batch} will
+#    # be set otherwise.
+#    require MT::Request;
+#    my $r = MT::Request->instance();
+#    my $batch = $r->stash('offline_batch');
+#    unless ($batch) {
+#        # Batch does not exist, so assume we can publish. Let other 
+#        # build_file_filters determine course of action.
+#        return 1;
+#    }
 
     require MT::PublishOption;
     my $throttle = MT::PublishOption::get_throttle($fi);
@@ -534,12 +575,13 @@ sub build_file_filter {
     # Prevent building of disabled templates if they get this far
     return 0 if $throttle->{type} == MT::PublishOption::DISABLED();
 
-    _create_publish_job( $fi, $batch );
-    return 0;
+    _create_publish_job( $fi );
+    # Return 1 so that other build file filters can do their thing.
+    return 1;
 }
 
 sub _create_publish_job {
-    my ($fi,$batch) = @_;
+    my ($fi) = @_;
 
     # Ok, let's build the Schwartz Job.
     require MT::TheSchwartz;
@@ -548,16 +590,22 @@ sub _create_publish_job {
     my $func_id = $ts->funcname_to_id($ts->driver_for,
                                       $ts->shuffled_databases,
                                       'MT::Worker::PublishOffline');
-    my $job = MT->model('ts_job')->new();
-    $job->funcid( $func_id );
-    $job->uniqkey( $fi->id );
-    $job->offline_batch_id( $batch->id );
+    my $job = MT->model('ts_job')->load({
+        funcid => $func_id,
+        uniqkey => $fi->id,
+                                        });
+    unless ($job) {
+        $job = MT->model('ts_job')->new();
+        $job->funcid( $func_id );
+        $job->uniqkey( $fi->id );
+    }
     $job->priority( $priority );
     $job->grabbed_until(1);
     $job->run_after(1);
     $job->coalesce( ( $fi->blog_id || 0 ) . ':' . $$ . ':' . $priority . ':' . ( time - ( time % 10 ) ) );
     $job->save or MT->log({
         blog_id => $fi->blog_id,
+        level   => MT::Log::ERROR(),
         message => "Could not queue offline publish job: " . $job->errstr
     });
 }

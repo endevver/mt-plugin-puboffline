@@ -22,6 +22,7 @@ sub work {
 
     # Build this
     my $mt = MT->instance;
+    my $plugin = MT->component('PubOffline');
 
     # reset publish timer; don't republish a file if it has
     # this or a later timestamp.
@@ -60,7 +61,9 @@ sub work {
         
         $File::Copy::Recursive::CopyLink = 1;
         my $source = MT->instance->config('StaticFilePath');
-        my $target = File::Spec->catfile($batch->path,"static");
+        my $base_path = $plugin->get_config_value('output_file_path',
+                                                  'blog:'.$batch->blog_id);
+        my $target = File::Spec->catfile($base_path,"static");
         $copied    = dircopy($source,$target);
 
         if (defined $copied && $copied > 0) {

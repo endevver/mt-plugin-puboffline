@@ -48,6 +48,7 @@
     <input type="hidden" name="blog_ids" value="<$mt:var name="blog_ids"$>" />
 </mt:If>
 
+<mt:ignore>
     <mtapp:setting
         id="file_path"
         label_class="top-label"
@@ -65,6 +66,7 @@
         show_hint="1">
       <input type="text" name="output_url" size="60" value="<$mt:var name="output_url"$>" style="width: 603px;" />
     </mtapp:setting>
+</mt:ignore>
 
 <mt:If name="archive_zip_installed">
     <mtapp:setting
@@ -81,7 +83,7 @@
         label_class="top-label"
         label="<__trans phrase="Include Date Identifier">">
       <input type="checkbox" name="date" id="date"<mt:If name="date"> checked="checked"</mt:If> />
-      <label for="date">Append a date identifier to the offline version parent folder.</label>
+      <label for="date">Append a date identifier to the zip file's name.</label>
     </mtapp:setting>
 
     <mtapp:setting
