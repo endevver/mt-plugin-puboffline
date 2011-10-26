@@ -5,10 +5,11 @@ use base qw( MT::Object );
 
 __PACKAGE__->install_properties({
     column_defs => {
-        id      => 'integer not null auto_increment',
-        blog_id => 'integer not null',
-        path    => 'string(255)', 
-        email   => 'string(255)', 
+        id            => 'integer not null auto_increment',
+        blog_id       => 'integer not null',
+        path          => 'string(255)', 
+        email         => 'string(255)', 
+        assets_copied => 'integer',
     },
     audit => 1,
     datasource  => 'offline_batch',

@@ -107,7 +107,8 @@ sub task_cleanup {
                 require MT::Mail;
                 my %head = ( 
                     To      => $batch->email, 
-                    Subject => '['.$batch->blog->name.'] Publishing Batch Finished'
+                    Subject => '[' . $batch->blog->name 
+                        . '] Offline Publishing Batch Finished',
                 );
                 my $body = "The offline publishing batch you initiated on "
                     . "$date has completed.\n\n"
@@ -168,7 +169,7 @@ sub _zip_offline {
         # Success!
         MT->log({ 
             message => "The offline publishing batch with an ID of " 
-                . $batch->id . " createe a zip archive at $zip_dest.",
+                . $batch->id . " created a zip archive at $zip_dest.",
             class   => "system",
             blog_id => $batch->blog->id,
             level   => MT::Log::INFO()
@@ -549,6 +550,10 @@ sub build_file_filter {
         $args{'file_info'}->{'__original_site_url'} = $url;
         $args{'Blog'}->site_path($site_path);
         $args{'Context'}->stash('__offline_mode',1);
+        MT->log({
+            blog_id => $args{'Blog'}->id,
+            message => 'Publishing file to: '.$args{'File'},
+        });
         # Return 1 and tell MT to physically publish the file!
         return 1;
     }
@@ -629,7 +634,7 @@ sub _create_copy_static_job {
     $job->coalesce( ( $batch->blog_id || 0 ) . ':' . $$ . ':' . 9 . ':' . ( time - ( time % 10 ) ) );
     $job->save or MT->log({
         blog_id => $batch->blog_id,
-        message => "Could not queue copy static job: " . $job->errstr
+        message => "PubOffline: could not queue copy static job: " . $job->errstr
     });
 }
 

@@ -4,7 +4,26 @@ description: "This plugin allows administrators to publish a version of their si
 author_name: Endevver
 author_link: http://endevver.com
 version: 0.8
-schema_version: 2.1
+schema_version: 3
+
+object_types:
+  offline_batch: 'PubOffline::OfflineBatch'
+  ts_job:
+    offline_batch_id: integer
+
+callbacks:
+  build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
+  build_page: $PubOffline::PubOffline::Plugin::build_page
+
+tasks: $PubOffline::PubOffline::Plugin::load_tasks
+
+task_workers:
+  publish_offline:
+    label: "Publishes an offline version of content"
+    class: 'MT::Worker::PublishOffline'
+  copy_static_offline:
+    label: "Copies static files into an offline folder"
+    class: 'MT::Worker::CopyStaticOffline'
 
 options:
   output_file_path:
@@ -29,11 +48,6 @@ settings:
     scope: blog
     default: 0
 
-object_types:
-  offline_batch: 'PubOffline::OfflineBatch'
-  ts_job:
-    offline_batch_id: integer
-
 tags:
   block:
     IsOfflineMode?: $PubOffline::PubOffline::Plugin::tag_is_offline
@@ -42,12 +56,6 @@ applications:
   cms:
     methods:
       pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue
-
-callbacks:
-  build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
-  build_page: $PubOffline::PubOffline::Plugin::build_page
-# TODO: callback for copying assets
-# TODO: callback for copying mt-static 
 
 page_actions:
   list_templates:
@@ -58,19 +66,4 @@ page_actions:
       permission: publish_post
       condition: >
         sub { MT->app->blog; }
-  theme_dashboard:
-    pub_offline:
-      label: 'Publish Offline Version'
-      order: 300
-      dialog: pub_offline
-      permission: publish_post
 
-tasks: $PubOffline::PubOffline::Plugin::load_tasks
-
-task_workers:
-  publish_offline:
-    label: "Publishes an offline version of content"
-    class: 'MT::Worker::PublishOffline'
-  copy_static_offline:
-    label: "Copies static files into an offline folder"
-    class: 'MT::Worker::CopyStaticOffline'

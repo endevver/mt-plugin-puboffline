@@ -111,7 +111,6 @@ sub work {
             }
         }
 
-        my $res;
         # Copy assets before any content can be published to the offline
         # folder. This way, assets will be in place and asset tags,
         # (especially <mt:AssetProperty file_size="1">) can work on them.
@@ -125,12 +124,15 @@ sub work {
         }
 
         $res = _rebuild_from_fileinfo($fi, $output_file_path);
+
         if (defined $res) {
             $job->completed();
             $rebuilt++;
         } else {
             my $error = $mt->publisher->errstr;
-            my $errmsg = $mt->translate("Error rebuilding file [_1]" . $fi->file_path . ": " . $error);
+            my $errmsg = $mt->translate(
+                "PubOffline: Error rebuilding file [_1]" . $fi->file_path . ": " . $error
+            );
             MT::TheSchwartz->debug($errmsg);
             $job->permanent_failure($errmsg);
             require MT::Log;
@@ -145,7 +147,13 @@ sub work {
     }
 
     if ($rebuilt) {
-        MT::TheSchwartz->debug($mt->translate("-- set complete ([quant,_1,file,files] in [_2] seconds)", $rebuilt, sprintf("%0.02f", tv_interval($start))));
+        MT::TheSchwartz->debug(
+            $mt->translate(
+                "-- set complete ([quant,_1,file,files] in [_2] seconds)", 
+                $rebuilt, 
+                sprintf("%0.02f", tv_interval($start))
+            )
+        );
     }
 
 }
@@ -267,11 +275,17 @@ sub _copy_assets {
     my $blog_site_path = shift;
     my ($batch) = @_;
 
-    my $iter = MT->model('asset')->load_iter({blog_id => $batch->blog_id, class => '*',});
+    # If the assets for this batch have already been copied just give up.
+    return if $batch->assets_copied;
+
+    my $iter = MT->model('asset')->load_iter({
+        blog_id => $batch->blog_id, 
+        class   => '*',
+    });
     while ( my $asset = $iter->() ) {
         # Give up if the asset doesn't exist on the file system. No point
         # trying to copy something that doesn't exist!
-        next unless $asset->file_path;
+        next unless $asset->file_path && -e $asset->file_path;
 
         # We need to rebuild the asset file path as the real, "online"
         # path, so that the file can be found.
@@ -279,12 +293,18 @@ sub _copy_assets {
         $rel_file_path =~ s/$blog_site_path//;
 
         my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
+        my $dest   = File::Spec->catfile($batch->path, $rel_file_path);
 
-        my $dest = File::Spec->catfile($batch->path, $rel_file_path);
+        # Finally, copy the asset.
         my $copied_asset = fcopy($source,$dest);
 
-        unless ($copied_asset) {
-            my $errmsg = MT->translate("Error copying assets to target directory: [_1]", $batch->path);
+        if (!$copied_asset) {
+            my $errmsg = MT->translate(
+                "PubOffline: Error copying asset ID [_1] ([_2]) to target directory: [_3]", 
+                $asset->id,
+                $source, 
+                $dest
+            );
             MT::TheSchwartz->debug($errmsg);
             MT->log({
                 ($batch->blog_id ? ( blog_id => $batch->blog_id ) : () ),
@@ -293,9 +313,16 @@ sub _copy_assets {
                 category => "publish",
                 level => MT::Log::ERROR(),
             });
-            return $errmsg;
         }
     }
+
+    # _copy_assets is actually set up to run for each job found in the ts_job 
+    # table. We want it to run once for each batch, but since the batch is 
+    # likely the same for each job, _copy_assets is probably running many, 
+    # many times. So, with _copy_assets complete, mark the batch so that we 
+    # don't need to try copying the same assets again.
+    $batch->assets_copied(1);
+    $batch->save or die $batch->errstr;
 }
 
 1;
