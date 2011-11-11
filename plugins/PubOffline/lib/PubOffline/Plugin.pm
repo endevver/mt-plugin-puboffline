@@ -378,211 +378,47 @@ sub _create_batch {
 #    $session->save;
 }
 
-# This is invoked just before the file is written. We use this to re-write
-# all URLs to map http://... to file://...
-sub build_page {
-    my ( $cb, %args ) = @_;
-    my $fi = $args{'file_info'};
-    if ($fi->{'is_offline_file'}) {
-        # Time to override the Blog's site path to the user specified site path
-        my $plugin = MT->component('PubOffline');
-        my $new_site_path = $plugin->get_config_value('output_file_path', 
-                                                      'blog:'.$fi->blog_id);
-
-        my $target  = $new_site_path;
-        $target = $target . '/' if $target !~ /\/$/;
-        
-        my $pattern = $fi->{'__original_site_url'};
-        my $content = $args{'Content'};
-
-        # The real blog site path was saved previously; grab it!
-#        use MT::Session;
-#        my $session = MT::Session::get_unexpired_value(
-#            86400, 
-#            { id   => 'Puboffline blog '.$batch->blog_id, 
-#              kind => 'po' }
-#        );
-#        my $blog_site_path = $session->data;
-        my $blog_site_path = $args{'Blog'}->site_path;
-        $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
-
-        # First determine if the current file is at the root of the blog
-        my $file_path = $fi->file_path;
-        $file_path =~ s/$target//;
-        my ($vol, $dirs_path, $file) = File::Spec->splitpath($file_path);
-        my @dirs = File::Spec->splitdir( $dirs_path );
-
-        
-        # The voodoo below constructs the relative path back to the root from the current
-        # file. This is used in building a path to static files, as well as to other 
-        # files in the web site/blog. Here is how it works. 
-        # a) Take a string to the current file. This should have the http://host removed.
-        # b) Extract the directories from that path.
-        my @reldirs;
-        my @dirs_to_file = File::Spec->splitdir( $file_path );
-        my $filename = pop @dirs_to_file;
-        # d) Replace each directory with a '..' (the relative equivalent)
-        foreach (@dirs_to_file) { unshift @reldirs,'..'; }
-        # By this point @reldirs holds the relative directory components back to the root
-
-        if ( scalar @dirs >= 1 ) {
-            print STDERR "$file_path is in a directory: $dirs_path.\n";
-            # If the file is not at the root, (that is, there were directories
-            # found) we need to determine how many folders up we need to go to
-            # get back to the root of the blog.
-            $$content =~ s{$pattern(.*?)("|')}{
-                my $quote  = $2;
-                my $target = $1;
-                
-                # Check if the target is a directory. Compare to the live
-                # published site, because the offline destination may not have
-                # been published yet.
-                if ( -d $blog_site_path.$target ) {
-                    # This is a directory. We can't have a bare directory in
-                    # the offline version, because clicking a link to it will
-                    # just show the contents of the directory.
-                    # So, append "index.html"
-                    $target = $target . '/' if $target !~ /\/$/;
-                    $target .= 'index.html';
-                }
-
-                ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
-                @dirs = File::Spec->splitdir( $dirs_path );
-#                unshift @dirs, '..';
-                my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
-                my $path = caturl($new_dirs_path, $file);
-                print STDERR "Path will be $path\n";
-                $path . $quote;
-            }emgx;
-        }
-        else {
-            print STDERR "$file_path is at the root.\n";
-            # If the file is at the root, we just need to generate a simple
-            # relative URL that doesn't need to traverse up a folder at all.
-            $$content =~ s{$pattern(.*?)("|')}{
-                my $quote  = $2;
-                my $target = $1;
-
-                # Remove the leading slash, if present. Since this file is at
-                # the root of the site, there should be no URLs starting with
-                # a slash.
-                $target =~ s/^\/(.*)$/$1/;
-
-                # Check if the target is a directory. Compare to the live
-                # published site, because the offline destination may not have
-                # been published yet.
-                if ( -d $blog_site_path.$target ) {
-                    # This is a directory. We can't have a bare directory in
-                    # the offline version, because clicking a link to it will
-                    # just show the contents of the directory.
-                    # So, append "index.html"
-                    if ($target ne '') {
-                        # $target will equal '' if it's the blog URL. We don't
-                        # want to prepend a slash for this. because it'll make
-                        # File::Spec->abs2rel() create a funky URL.
-                        $target = $target . '/' if $target !~ /\/$/;
-                    }
-                    $target .= 'index.html';
-                }
-
-                # abs2rel will convert the path to something relative.
-                # $quote is the single or double quote to be included.
-                File::Spec->abs2rel( $target ) . $quote;
-            }emgx;
-        }
-
-        # Static content may be specified with StaticWebPath or
-        # PluginStaticWebPath, so we need to fix those URLs, too.
-        require MT::Template::ContextHandlers;
-        my ($static_pattern,$static_pattern_a,$static_pattern_b);
-        $static_pattern_a = $static_pattern_b = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
-        $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
-        $static_pattern = "($static_pattern_a|$static_pattern_b)";
-        if ( scalar @dirs >= 1 ) {
-            # If the file is not at the root, (that is, there were directories
-            # found) we need to determine how many folders up we need to go to
-            # get back to the root of the blog.
-#            print STDERR "Static path needs to be made relative.\n";
-            $$content =~ s{$static_pattern([^"'\)]*)(["'\)])}{
-                ($vol, $dirs_path, $file) = File::Spec->splitpath($2);
-                @dirs = File::Spec->splitdir( $dirs_path );
-                my $path = caturl(@reldirs, 'static', @dirs, $file);
-                $path . $3;
-            }emgx;
-        }
-        else {
-            # If the file is at the root, we just need to generate a simple
-            # relative URL that doesn't need to traverse up a folder at all.
-#            print STDERR "File is at root\n";
-            $$content =~ s{$static_pattern([^"'\)]*)}{
-                # abs2rel will convert the path to something relative.
-                # $2 is the single or double quote to be included.
-                #File::Spec->abs2rel( 'static/'.$1 ) . $2;
-                File::Spec->abs2rel( 'static/'.$2 ) . $3;
-            }emgx;
-        }
-
-        # The CGIPath is used in mt.js, and may be used for commenting forms,
-        # for example. Changing those to relative URLs doesn't really matter
-        # because it'll point to something that doesn't work: mt-comments.cgi,
-        # for example, isn't copied offline, and even if it was it won't work
-        # because it's not set up!
-    }
-}
-
-# Adds every non-disabled template to the publish queue. 
+# Any time a template is published, it goes through the build_filter_filter.
+# PubOffline works by hooking into this callback and publishing an additional
+# copy of the file to the designated offline location. 
 # This is a near copy of the build_file_filter in MT::WeblogPublisher
 sub build_file_filter {
     my ( $cb, %args ) = @_;
     my $fi = $args{'file_info'};
+    my $plugin = MT->component('PubOffline');
 
-    # This first block of code checks to see if the file being republished is coming
-    # from the MT::Worker::PubOffline worker. If it is, then we know that we need to 
-    # publish this asynchronously. We also know we need to tweak the context a bit
-    # to "trick" the system into publishing the file to a different destination 
-    # (e.g. the offline folder).
+    # We want to give up if PubOffline was not enabled on this blog.
+    my $enabled = $plugin->get_config_value(
+        'enable_puboffline',
+        'blog:' . $fi->blog_id
+    );
+    return if !$enabled;
+
+    # This first block of code checks to see if the file being republished is
+    # coming from the PubOffline::Worker::PublishOffline worker. If it is,
+    # then we know that we need to set the IsOfflineMode tag context to true
+    # so that any offline templating publishing correctly.
     if ($fi->{'is_offline_file'}) {
-        my $plugin = MT->component('PubOffline');
-        my $site_path = $plugin->get_config_value('output_file_path', 'blog:'.$fi->blog_id);
 
-        # Time to override the Blog's site path to the user specified site path
-        my $url   = $args{'Blog'}->site_url;
-        $args{'file_info'}->{'__original_site_url'} = $url;
-        $args{'Blog'}->site_path($site_path);
-        $args{'Context'}->stash('__offline_mode',1);
-        MT->log({
-            blog_id => $args{'Blog'}->id,
-            message => 'Publishing file to: '.$args{'File'},
-        });
-        # Return 1 and tell MT to physically publish the file!
+        # This flag is used for the IsOfflineMode tag.
+        $args{'Context'}->stash('__offline_mode', 1);
+
+        # Return and tell MT to physically publish the file!
         return 1;
     }
 
-# This code is not needed because if the request is not coming from the worker,
-# then it is coming through the regular course of publishing, in which case,
-# we need to create a job for publishing this file via PubOffline in addition to
-# whatever other file is being published.
-#    # We are obviously not coming from the MT::Worker::PublishOffline 
-#    # task. We know this of course because $fi->{offline_batch} will
-#    # be set otherwise.
-#    require MT::Request;
-#    my $r = MT::Request->instance();
-#    my $batch = $r->stash('offline_batch');
-#    unless ($batch) {
-#        # Batch does not exist, so assume we can publish. Let other 
-#        # build_file_filters determine course of action.
-#        return 1;
-#    }
-
+    # Since we got this far, we know that the 
+    # PubOffline::Worker::PublishOffline is not running this callback. That
+    # means we want to be sure to create an offline counterpart for this job,
+    # and that's what the below is reponsible for ensuring.
+    
     require MT::PublishOption;
     my $throttle = MT::PublishOption::get_throttle($fi);
 
     # Prevent building of disabled templates if they get this far
-    return 0 if $throttle->{type} == MT::PublishOption::DISABLED();
+    return if $throttle->{type} == MT::PublishOption::DISABLED();
 
     _create_publish_job( $fi );
-    # Return 1 so that other build file filters can do their thing.
-    return 1;
 }
 
 sub _create_publish_job {
@@ -592,27 +428,198 @@ sub _create_publish_job {
     require MT::TheSchwartz;
     my $ts = MT::TheSchwartz->instance();
     my $priority = _get_job_priority($fi);
-    my $func_id = $ts->funcname_to_id($ts->driver_for,
-                                      $ts->shuffled_databases,
-                                      'MT::Worker::PublishOffline');
+    my $func_id = $ts->funcname_to_id(
+        $ts->driver_for,
+        $ts->shuffled_databases,
+        'PubOffline::Worker::PublishOffline'
+    );
+
+    # Look for a job that has these parameters.
     my $job = MT->model('ts_job')->load({
         funcid => $func_id,
         uniqkey => $fi->id,
-                                        });
+    });
+
     unless ($job) {
         $job = MT->model('ts_job')->new();
         $job->funcid( $func_id );
         $job->uniqkey( $fi->id );
     }
+
     $job->priority( $priority );
     $job->grabbed_until(1);
     $job->run_after(1);
-    $job->coalesce( ( $fi->blog_id || 0 ) . ':' . $$ . ':' . $priority . ':' . ( time - ( time % 10 ) ) );
+    $job->coalesce( 
+        ( $fi->blog_id || 0 ) 
+        . ':' . $$ 
+        . ':' . $priority 
+        . ':' . ( time - ( time % 10 ) ) 
+    );
+
     $job->save or MT->log({
         blog_id => $fi->blog_id,
         level   => MT::Log::ERROR(),
         message => "Could not queue offline publish job: " . $job->errstr
     });
+}
+
+# This is invoked just before the file is written. We use this to re-write
+# all URLs to map http://... to file://...
+sub build_page {
+    my ( $cb, %args ) = @_;
+    my $fi = $args{'file_info'};
+    my $plugin = MT->component('PubOffline');
+
+    # We want to give up if PubOffline was not enabled on this blog.
+    my $enabled = $plugin->get_config_value(
+        'enable_puboffline',
+        'blog:'.$fi->blog_id
+    );
+    return if !$enabled;
+
+    MT->log('At the build_page filter: '.$fi->file_path);
+
+    # Give up if this callback was *not* invoked for an offline publish job.
+    # Basically, if not coming from PubOffline::Worker::PublishOffline, quit.
+    return if !$fi->{'is_offline_file'};
+
+    MT->log({
+        blog_id => $args{'Blog'}->id,
+        message => 'Publishing file to: ' . $args{'File'},
+    });
+
+    my $output_file_path = _get_output_path({ blog_id => $fi->blog_id });
+
+    my $target  = $output_file_path;
+    $target = $target . '/' if $target !~ /\/$/;
+    
+    my $pattern = $fi->{'__original_site_url'};
+    my $content = $args{'Content'};
+
+    my $blog_site_path = $args{'Blog'}->site_path;
+    $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
+
+    # First determine if the current file is at the root of the blog
+    my $file_path = $fi->file_path;
+    $file_path =~ s/$target//;
+    my ($vol, $dirs_path, $file) = File::Spec->splitpath($file_path);
+    my @dirs = File::Spec->splitdir( $dirs_path );
+
+    
+    # The voodoo below constructs the relative path back to the root from the current
+    # file. This is used in building a path to static files, as well as to other 
+    # files in the web site/blog. Here is how it works. 
+    # a) Take a string to the current file. This should have the http://host removed.
+    # b) Extract the directories from that path.
+    my @reldirs;
+    my @dirs_to_file = File::Spec->splitdir( $file_path );
+    my $filename = pop @dirs_to_file;
+    # d) Replace each directory with a '..' (the relative equivalent)
+    foreach (@dirs_to_file) { unshift @reldirs,'..'; }
+    # By this point @reldirs holds the relative directory components back to the root
+
+    if ( scalar @dirs >= 1 ) {
+        print STDERR "$file_path is in a directory: $dirs_path.\n";
+        # If the file is not at the root, (that is, there were directories
+        # found) we need to determine how many folders up we need to go to
+        # get back to the root of the blog.
+        $$content =~ s{$pattern(.*?)("|')}{
+            my $quote  = $2;
+            my $target = $1;
+            
+            # Check if the target is a directory. Compare to the live
+            # published site, because the offline destination may not have
+            # been published yet.
+            if ( -d $blog_site_path.$target ) {
+                # This is a directory. We can't have a bare directory in
+                # the offline version, because clicking a link to it will
+                # just show the contents of the directory.
+                # So, append "index.html"
+                $target = $target . '/' if $target !~ /\/$/;
+                $target .= 'index.html';
+            }
+
+            ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
+            @dirs = File::Spec->splitdir( $dirs_path );
+#                unshift @dirs, '..';
+            my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
+            my $path = caturl($new_dirs_path, $file);
+            print STDERR "Path will be $path\n";
+            $path . $quote;
+        }emgx;
+    }
+    else {
+        print STDERR "$file_path is at the root.\n";
+        # If the file is at the root, we just need to generate a simple
+        # relative URL that doesn't need to traverse up a folder at all.
+        $$content =~ s{$pattern(.*?)("|')}{
+            my $quote  = $2;
+            my $target = $1;
+
+            # Remove the leading slash, if present. Since this file is at
+            # the root of the site, there should be no URLs starting with
+            # a slash.
+            $target =~ s/^\/(.*)$/$1/;
+
+            # Check if the target is a directory. Compare to the live
+            # published site, because the offline destination may not have
+            # been published yet.
+            if ( -d $blog_site_path.$target ) {
+                # This is a directory. We can't have a bare directory in
+                # the offline version, because clicking a link to it will
+                # just show the contents of the directory.
+                # So, append "index.html"
+                if ($target ne '') {
+                    # $target will equal '' if it's the blog URL. We don't
+                    # want to prepend a slash for this. because it'll make
+                    # File::Spec->abs2rel() create a funky URL.
+                    $target = $target . '/' if $target !~ /\/$/;
+                }
+                $target .= 'index.html';
+            }
+
+            # abs2rel will convert the path to something relative.
+            # $quote is the single or double quote to be included.
+            File::Spec->abs2rel( $target ) . $quote;
+        }emgx;
+    }
+
+    # Static content may be specified with StaticWebPath or
+    # PluginStaticWebPath, so we need to fix those URLs, too.
+    require MT::Template::ContextHandlers;
+    my ($static_pattern,$static_pattern_a,$static_pattern_b);
+    $static_pattern_a = $static_pattern_b = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
+    $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
+    $static_pattern = "($static_pattern_a|$static_pattern_b)";
+    if ( scalar @dirs >= 1 ) {
+        # If the file is not at the root, (that is, there were directories
+        # found) we need to determine how many folders up we need to go to
+        # get back to the root of the blog.
+#            print STDERR "Static path needs to be made relative.\n";
+        $$content =~ s{$static_pattern([^"'\)]*)(["'\)])}{
+            ($vol, $dirs_path, $file) = File::Spec->splitpath($2);
+            @dirs = File::Spec->splitdir( $dirs_path );
+            my $path = caturl(@reldirs, 'static', @dirs, $file);
+            $path . $3;
+        }emgx;
+    }
+    else {
+        # If the file is at the root, we just need to generate a simple
+        # relative URL that doesn't need to traverse up a folder at all.
+#            print STDERR "File is at root\n";
+        $$content =~ s{$static_pattern([^"'\)]*)}{
+            # abs2rel will convert the path to something relative.
+            # $2 is the single or double quote to be included.
+            File::Spec->abs2rel( 'static/'.$1 ) . $2;
+            #File::Spec->abs2rel( 'static/'.$2 ) . $3;
+        }emgx;
+    }
+
+    # The CGIPath is used in mt.js, and may be used for commenting forms,
+    # for example. Changing those to relative URLs doesn't really matter
+    # because it'll point to something that doesn't work: mt-comments.cgi,
+    # for example, isn't copied offline, and even if it was it won't work
+    # because it's not set up!
 }
 
 sub _create_copy_static_job {
@@ -675,5 +682,37 @@ sub _get_job_priority {
     return $priority;
 }
 
+# The output file path is set in the plugin's Settings, and can contain MT
+# tags. If the output file path contains any MT tags, we want to render those
+# before trying to use output_file_path.
+sub _get_output_path {
+    my ($arg_refs) = @_;
+    my $blog_id = $arg_refs->{blog_id};
+    my $plugin = MT->component('PubOffline');
+
+    # If the output file path contains any MT tags, we want to render
+    # those before trying to use output_file_path.
+    my $output_file_path = $plugin->get_config_value(
+        'output_file_path',
+        'blog:' . $blog_id
+    );
+
+    use MT::Template::Context;
+    my $ctx = MT::Template::Context->new;
+    # Blog ID needs to be set to get into the correct context.
+    $ctx->stash('blog_id', $blog_id );
+
+    # Render the tags with a template object that isn't saved.
+    my $output_file_path_tmpl = MT::Template->new();
+    $output_file_path_tmpl->text( $output_file_path );
+    $output_file_path_tmpl->blog_id( $blog_id );
+
+    my $result = $output_file_path_tmpl->build($ctx)
+        or die $output_file_path_tmpl->errstr;
+
+    return $result;
+}
+
 1;
+
 __END__

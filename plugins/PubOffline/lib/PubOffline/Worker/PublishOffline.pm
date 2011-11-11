@@ -1,10 +1,4 @@
-# Movable Type (r) (C) 2001-2010 Six Apart, Ltd. All Rights Reserved.
-# This code cannot be redistributed without permission from www.sixapart.com.
-# For more information, consult your Movable Type license.
-#
-# $Id: Publish.pm 3455 2009-02-23 02:29:31Z auno $
-
-package MT::Worker::PublishOffline;
+package PubOffline::Worker::PublishOffline;
 
 use strict;
 use base qw( TheSchwartz::Worker );
@@ -56,41 +50,34 @@ sub work {
 
         # FileInfo record missing? Strange, but ignore and continue.
         unless ($fi) {
+            MT->log({
+                level   => MT->model('log')->INFO(),
+                message => 'PubOffline: fileinfo record missing. Job ID: ' 
+                    . $job->{column_values}->{jobid},
+            });
             $job->completed();
             next;
         }
 
-        # The real blog site path was saved previously; grab it!
-#        use MT::Session;
-#        my $session = MT::Session::get_unexpired_value(86400, 
-#                        { id   => 'Puboffline blog '.$fi->blog_id, 
-#                          kind => 'po' });
-#        my $blog_site_path = $session->data;
-
         my $blog = MT->model('blog')->load( $fi->blog_id );
         my $blog_site_path = $blog->site_path;
 
-        my $plugin           = MT->component('PubOffline');
-        my $config           = $plugin->get_config_hash( 'blog:' . $fi->blog_id );
-        my $output_file_path = $config->{'output_file_path'};
-#        my $base_url         = $config->{'base_url'};
-#        my $batch;
-#        if ($mt_job->has_column('offline_batch_id')) {
-#            $batch = MT->model('offline_batch')->load( $mt_job->offline_batch_id );
-            my $fp = $fi->file_path;
-            $fp =~ s/^$blog_site_path(\/)*//;
-            my $np = File::Spec->catfile($output_file_path, $fp);
-            # TODO - change $fi record to point to different base directory
-            $fi->file_path($np);
-#        } else {
-#            MT->log( "Apparently, the job does not have the offline_batch_id column" );
-#        }
+        my $output_file_path = PubOffline::Plugin::_get_output_path({ 
+            blog_id => $fi->blog_id 
+        });
+
+        my $fp = $fi->file_path;
+        $fp =~ s/^$blog_site_path(\/)*//;
+        my $np = File::Spec->catfile($output_file_path, $fp);
+        # TODO - change $fi record to point to different base directory
+        $fi->file_path($np);
 
         my $priority = $job->priority ? ", priority " . $job->priority : "";
 
         # Important: prevents requeuing!
         $fi->{'from_queue'} = 1;
-#        $fi->{'offline_batch'} = $batch;
+
+        # So that the build_file_filter callback doesn't happen again.
         $fi->{'is_offline_file'} = 1;
 
         my $mtime = (stat($fi->file_path))[9];
@@ -119,11 +106,11 @@ sub work {
 # TODO - uncomment or find a new home:
 #        $res = _copy_assets($blog_site_path, $batch);
 
-        if ($res) {
-            $job->permanent_failure($res);
-        }
+        # if ($res) {
+        #     $job->permanent_failure($res);
+        # }
 
-        $res = _rebuild_from_fileinfo($fi, $output_file_path);
+        my $res = _rebuild_from_fileinfo($fi, $output_file_path);
 
         if (defined $res) {
             $job->completed();
@@ -138,10 +125,10 @@ sub work {
             require MT::Log;
             $mt->log({
                 ($fi->blog_id ? ( blog_id => $fi->blog_id ) : () ),
-                message => $errmsg,
+                message  => $errmsg,
                 metadata => log_time() . ' ' . $errmsg . ":\n" . $error,
                 category => "publish",
-                level => MT::Log::ERROR(),
+                level    => MT::Log::ERROR(),
             });
         }
     }
@@ -155,7 +142,6 @@ sub work {
             )
         );
     }
-
 }
 
 sub grab_for { 60 }
@@ -167,8 +153,8 @@ sub retry_delay { 60 }
 # so that the site will output all files to the correct location.
 sub _rebuild_from_fileinfo {
     my $pub = MT::WeblogPublisher->new();
-#    my $offline_path = pop;
-    my ($fi) = @_;
+    my ($fi) = shift;
+    my $output_file_path = shift;
 
     require MT::Blog;
     require MT::Entry;
@@ -189,35 +175,38 @@ sub _rebuild_from_fileinfo {
         file_info    => $fi
       );
 
+
     if ( $at eq 'index' ) {
         my $tmpl = MT->model('template')->load( $fi->template_id );
-        my $new_path = $fi->file_path;
-        # TODO - this is indiscriminate. it needs to differentiate between xml, js, css, etc
-        $new_path =~ s/[^\.]+$/html/;
-        $tmpl->outfile( $new_path );
+
+        # Pass the blog object to rebuild_indexes with an updated site_path,
+        # reflecting the desired puboffline location. Save the original site
+        # path so that we can reset it later.
+        my $blog = MT->model('blog')->load( $fi->blog_id );
+        my $saved_site_path = $blog->site_path;
+        $blog->site_path( $output_file_path );
+
         $pub->rebuild_indexes(
-            BlogID   => $fi->blog_id,
+            Blog     => $blog,
             Template => $tmpl,
             FileInfo => $fi,
             Force    => 1,
         ) or return;
+
+        # Reset to the original site path. If a non-
+        # PubOffline::Worker::PublishOffline worker runs after this (such as 
+        # MT::Worker::Publish) then we want it to have the "real" path to work
+        # with so that it can publish properly, too.
+        $blog->site_path( $saved_site_path );
+
         return 1;
     }
 
     return 1 if $at eq 'None';
 
+    my $blog = MT->model('blog')->load( $fi->blog_id );
+
     my ( $start, $end );
-    my $blog = MT->model('blog')->load( $fi->blog_id )
-        if $fi->blog_id;
-
-    my $plugin           = MT->component('PubOffline');
-    my $config           = $plugin->get_config_hash( 'blog:' . $fi->blog_id );
-    my $output_file_path = $config->{'output_file_path'};
-    my $base_url         = $config->{'base_url'};
-
-    # Set the site_path, but don't save it--we don't want to overwrite it.
-    $blog->site_path( $output_file_path );
-
     my $entry = MT->model('entry')->load( $fi->entry_id )
       or return $pub->error(
         MT->translate( "Parameter '[_1]' is required", 'Entry' ) )
@@ -257,19 +246,28 @@ sub _rebuild_from_fileinfo {
         $ctx->{current_timestamp_end} = $end;
     }
 
-    my $arch_root =
-      ( $at eq 'Page' ) ? $blog->site_path : $blog->archive_path;
+    # Set the $arch_root to the specified offline path. $pub->rebuild_file
+    # uses this combined with the filename to create the file that is output.
+    my $arch_root = PubOffline::Plugin::_get_output_path({ blog_id => $blog->id });
+
     return $pub->error(
         MT->translate("You did not set your blog publishing path") )
       unless $arch_root;
 
     my %cond;
+
+    MT->log("Ready to rebuild ".$fi->file_path);
+
     $pub->rebuild_file( $blog, $arch_root, $map, $at, $ctx, \%cond, 1,
         FileInfo => $fi, )
       or return;
 
-    1;
+    return 1;
 }
+
+1;
+
+__END__
 
 sub _copy_assets {
     my $blog_site_path = shift;
@@ -325,4 +323,3 @@ sub _copy_assets {
     $batch->save or die $batch->errstr;
 }
 
-1;

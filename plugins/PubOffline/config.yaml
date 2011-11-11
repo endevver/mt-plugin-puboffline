@@ -12,32 +12,40 @@ object_types:
     offline_batch_id: integer
 
 callbacks:
-  build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
-  build_page: $PubOffline::PubOffline::Plugin::build_page
+    build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
+    build_page: $PubOffline::PubOffline::Plugin::build_page
 
 tasks: $PubOffline::PubOffline::Plugin::load_tasks
 
 task_workers:
-  publish_offline:
-    label: "Publishes an offline version of content"
-    class: 'MT::Worker::PublishOffline'
-  copy_static_offline:
-    label: "Copies static files into an offline folder"
-    class: 'MT::Worker::CopyStaticOffline'
+    publish_offline:
+        label: "Publishes an offline version of content"
+        class: 'PubOffline::Worker::PublishOffline'
+    copy_static_offline:
+        label: "Copies static files into an offline folder"
+        class: 'MT::Worker::CopyStaticOffline'
 
 options:
-  output_file_path:
-    scope: blog
-    type: text
-    label: Output File Path
-    description: 'This is the path that "Publish Offline" will output its files to.'
-    default: '<mt:BlogSitePath>puboffline/'
-  output_url:
-    scope: blog
-    type: text
-    label: Base URL
-    description: 'This is the base URL for accessing files published by "Publish Offline."'
-    default: '<mt:BlogURL>puboffline/'
+    enable_puboffline:
+        label: 'Enable Publish Offline'
+        hint: 'Enable or disable Publish Offline for this blog.'
+        scope: blog
+        type: checkbox
+        order: 1
+    output_file_path:
+        label: 'Output File Path'
+        hint: 'This is the path that Publish Offline will output its files to. This should be an absolute file path; MT tags are allowed, though <a href="http://www.movabletype.org/documentation/appendices/tags/blogsitepath.html" target="_blank">BlogSitePath</a> is likley the only tag you would use.'
+        scope: blog
+        type: text
+        default: '<mt:BlogSitePath>puboffline/'
+        order: 2
+    output_url:
+        label: 'Output URL'
+        hint: 'Enter a URL to the offline version of this web site. If the Output File Path does not reference a web accessible directory, leave this field blank. (The Output URL is supplied with the notification email only.)'
+        scope: blog
+        type: text
+        default: '<mt:BlogURL>puboffline/'
+        order: 3
 
 # Obsolete
 settings:
