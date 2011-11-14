@@ -149,8 +149,9 @@ sub max_retries { 0 }
 sub retry_delay { 60 }
 
 # This is lifted from MT::WeblogPublisher, with a few changes.
-# Notably, the blog site_path needs to be set to the batch path
-# so that the site will output all files to the correct location.
+# Notably, when publishing index files the blog site path needs to be reset to
+# the offline path; when publishing archives the archive root needs to be set
+# to the offline path instead of the site path, also.
 sub _rebuild_from_fileinfo {
     my $pub = MT::WeblogPublisher->new();
     my ($fi) = shift;
@@ -255,8 +256,6 @@ sub _rebuild_from_fileinfo {
       unless $arch_root;
 
     my %cond;
-
-    MT->log("Ready to rebuild ".$fi->file_path);
 
     $pub->rebuild_file( $blog, $arch_root, $map, $at, $ctx, \%cond, 1,
         FileInfo => $fi, )

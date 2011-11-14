@@ -467,66 +467,107 @@ sub _create_publish_job {
 # all URLs to map http://... to file://...
 sub build_page {
     my ( $cb, %args ) = @_;
-    my $fi = $args{'file_info'};
+    my $fi     = $args{'file_info'};
+    my $blog   = $args{'blog'};
     my $plugin = MT->component('PubOffline');
 
     # We want to give up if PubOffline was not enabled on this blog.
     my $enabled = $plugin->get_config_value(
         'enable_puboffline',
-        'blog:'.$fi->blog_id
+        'blog:'.$blog->id
     );
     return if !$enabled;
-
-    MT->log('At the build_page filter: '.$fi->file_path);
 
     # Give up if this callback was *not* invoked for an offline publish job.
     # Basically, if not coming from PubOffline::Worker::PublishOffline, quit.
     return if !$fi->{'is_offline_file'};
 
     MT->log({
-        blog_id => $args{'Blog'}->id,
-        message => 'Publishing file to: ' . $args{'File'},
+        blog_id => $blog->id,
+        level   => MT::Log::INFO(),
+        message => 'PubOffline is writing to: ' . $args{'File'},
     });
 
-    my $output_file_path = _get_output_path({ blog_id => $fi->blog_id });
-
-    my $target  = $output_file_path;
-    $target = $target . '/' if $target !~ /\/$/;
-    
-    my $pattern = $fi->{'__original_site_url'};
-    my $content = $args{'Content'};
-
-    my $blog_site_path = $args{'Blog'}->site_path;
+    my $blog_site_path = $blog->site_path;
     $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
+
+    # Use the output file path to determine how many directories deep a URL
+    # needs to point to create the relative link.
+    my $output_file_path = _get_output_path({ blog_id => $blog->id });
 
     # First determine if the current file is at the root of the blog
     my $file_path = $fi->file_path;
-    $file_path =~ s/$target//;
+    $file_path =~ s/$output_file_path//;
     my ($vol, $dirs_path, $file) = File::Spec->splitpath($file_path);
     my @dirs = File::Spec->splitdir( $dirs_path );
 
-    
-    # The voodoo below constructs the relative path back to the root from the current
-    # file. This is used in building a path to static files, as well as to other 
-    # files in the web site/blog. Here is how it works. 
-    # a) Take a string to the current file. This should have the http://host removed.
+    # The voodoo below constructs the relative path back to the root from the
+    # current file. This is used in building a path to static files, as well
+    # as to other files in the web site/blog. Here is how it works. 
+    # a) Take a string to the current file. This should have the http://host
+    #    removed.
     # b) Extract the directories from that path.
     my @reldirs;
     my @dirs_to_file = File::Spec->splitdir( $file_path );
     my $filename = pop @dirs_to_file;
-    # d) Replace each directory with a '..' (the relative equivalent)
+    # c) Replace each directory with a '..' (the relative equivalent)
     foreach (@dirs_to_file) { unshift @reldirs,'..'; }
     # By this point @reldirs holds the relative directory components back to the root
 
+    # Content is the actual rendered page HTML. Search it for the $pattern to
+    # create a relative directory.
+    my $pattern = $blog->site_url;
+    my $content = $args{'Content'};
+
+    # Static content may be specified with StaticWebPath or
+    # PluginStaticWebPath, so we need to fix those URLs. Do this before fixing
+    # any other URL because StaticWebPath may be in the BlogURL, but different
+    # from the default.
+    require MT::Template::ContextHandlers;
+    my ($static_pattern,$static_pattern_a,$static_pattern_b);
+    $static_pattern_a = $static_pattern_b 
+        = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
+    $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
+    $static_pattern = "($static_pattern_a|$static_pattern_b)";
+
+    # If the file is not at the root, (that is, there were directories
+    # found) we need to determine how many folders up we need to go to
+    # get back to the root of the blog.
     if ( scalar @dirs >= 1 ) {
-        print STDERR "$file_path is in a directory: $dirs_path.\n";
-        # If the file is not at the root, (that is, there were directories
-        # found) we need to determine how many folders up we need to go to
-        # get back to the root of the blog.
+        # print STDERR "Static path needs to be made relative.\n";
+        $$content =~ s{$static_pattern([^"'\)]*)(["'\)])}{
+            ($vol, $dirs_path, $file) = File::Spec->splitpath($2);
+            @dirs = File::Spec->splitdir( $dirs_path );
+            my $path = caturl(@reldirs, 'static', @dirs, $file);
+            $path . $3;
+        }emgx;
+    }
+    # If the file is at the root, we just need to generate a simple
+    # relative URL that doesn't need to traverse up a folder at all.
+    else {
+        # print STDERR "File is at root\n";
+        $$content =~ s{$static_pattern([^"'\)]*)}{
+            # abs2rel will convert the path to something relative.
+            # $2 is the single or double quote to be included.
+            File::Spec->abs2rel( 'static/' . $2 );
+        }emgx;
+    }
+
+    # Note: The CGIPath is used in mt.js, and may be used for commenting
+    # forms,for example. Changing those to relative URLs doesn't really matter
+    # because it'll point to something that doesn't work: mt-comments.cgi, for
+    # example, isn't copied offline, and even if it was it won't work because
+    # it's not set up!
+
+    # If the file is not at the root, (that is, there were directories
+    # found) we need to determine how many folders up we need to go to
+    # get back to the root of the blog.
+    if ( scalar @dirs >= 1 ) {
+        #print STDERR "$file_path is in a directory: $dirs_path.\n";
         $$content =~ s{$pattern(.*?)("|')}{
             my $quote  = $2;
             my $target = $1;
-            
+
             # Check if the target is a directory. Compare to the live
             # published site, because the offline destination may not have
             # been published yet.
@@ -544,14 +585,14 @@ sub build_page {
 #                unshift @dirs, '..';
             my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
             my $path = caturl($new_dirs_path, $file);
-            print STDERR "Path will be $path\n";
+            #print STDERR "Path will be $path\n";
             $path . $quote;
         }emgx;
     }
+    # If the file is at the root, we just need to generate a simple
+    # relative URL that doesn't need to traverse up a folder at all.
     else {
-        print STDERR "$file_path is at the root.\n";
-        # If the file is at the root, we just need to generate a simple
-        # relative URL that doesn't need to traverse up a folder at all.
+        #print STDERR "$file_path is at the root.\n";
         $$content =~ s{$pattern(.*?)("|')}{
             my $quote  = $2;
             my $target = $1;
@@ -583,43 +624,6 @@ sub build_page {
             File::Spec->abs2rel( $target ) . $quote;
         }emgx;
     }
-
-    # Static content may be specified with StaticWebPath or
-    # PluginStaticWebPath, so we need to fix those URLs, too.
-    require MT::Template::ContextHandlers;
-    my ($static_pattern,$static_pattern_a,$static_pattern_b);
-    $static_pattern_a = $static_pattern_b = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
-    $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
-    $static_pattern = "($static_pattern_a|$static_pattern_b)";
-    if ( scalar @dirs >= 1 ) {
-        # If the file is not at the root, (that is, there were directories
-        # found) we need to determine how many folders up we need to go to
-        # get back to the root of the blog.
-#            print STDERR "Static path needs to be made relative.\n";
-        $$content =~ s{$static_pattern([^"'\)]*)(["'\)])}{
-            ($vol, $dirs_path, $file) = File::Spec->splitpath($2);
-            @dirs = File::Spec->splitdir( $dirs_path );
-            my $path = caturl(@reldirs, 'static', @dirs, $file);
-            $path . $3;
-        }emgx;
-    }
-    else {
-        # If the file is at the root, we just need to generate a simple
-        # relative URL that doesn't need to traverse up a folder at all.
-#            print STDERR "File is at root\n";
-        $$content =~ s{$static_pattern([^"'\)]*)}{
-            # abs2rel will convert the path to something relative.
-            # $2 is the single or double quote to be included.
-            File::Spec->abs2rel( 'static/'.$1 ) . $2;
-            #File::Spec->abs2rel( 'static/'.$2 ) . $3;
-        }emgx;
-    }
-
-    # The CGIPath is used in mt.js, and may be used for commenting forms,
-    # for example. Changing those to relative URLs doesn't really matter
-    # because it'll point to something that doesn't work: mt-comments.cgi,
-    # for example, isn't copied offline, and even if it was it won't work
-    # because it's not set up!
 }
 
 sub _create_copy_static_job {
@@ -696,6 +700,9 @@ sub _get_output_path {
         'output_file_path',
         'blog:' . $blog_id
     );
+
+    # Add a trailing slash, if needed.
+    $output_file_path = $output_file_path . '/' if $output_file_path !~ /\/$/;
 
     use MT::Template::Context;
     my $ctx = MT::Template::Context->new;
