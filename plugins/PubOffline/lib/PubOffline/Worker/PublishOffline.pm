@@ -50,6 +50,7 @@ sub work {
 
         # FileInfo record missing? Strange, but ignore and continue.
         unless ($fi) {
+            # Should this even be logged?
             MT->log({
                 level   => MT->model('log')->INFO(),
                 message => 'PubOffline: fileinfo record missing. Job ID: ' 
@@ -59,12 +60,28 @@ sub work {
             next;
         }
 
-        my $blog = MT->model('blog')->load( $fi->blog_id );
-        my $blog_site_path = $blog->site_path;
-
         my $output_file_path = PubOffline::Plugin::_get_output_path({ 
             blog_id => $fi->blog_id 
         });
+
+        # First, lets check that the PubOffline output path is somewhere we
+        # can write to.
+        if (!-w $output_file_path) {
+            MT->log({
+                level   => MT->model('log')->ERROR(),
+                blog_id => $fi->blog_id,
+                message => 'PubOffline could not write to the Output File '
+                    . 'Path (' . $output_file_path . ') as specified in the '
+                    . 'plugin Settings. Check folder and user permissions to '
+                    . 'ensure that location is writable.',
+            });
+            
+            # Give up, since we can't write this fine anyway.
+            next;
+        }
+
+        my $blog = MT->model('blog')->load( $fi->blog_id );
+        my $blog_site_path = $blog->site_path;
 
         my $fp = $fi->file_path;
         $fp =~ s/^$blog_site_path(\/)*//;
@@ -98,18 +115,7 @@ sub work {
             }
         }
 
-        # Copy assets before any content can be published to the offline
-        # folder. This way, assets will be in place and asset tags,
-        # (especially <mt:AssetProperty file_size="1">) can work on them.
-
-# TODO - this needs to be done more on demand, since the concept of a batch is now obsolete
-# TODO - uncomment or find a new home:
-#        $res = _copy_assets($blog_site_path, $batch);
-
-        # if ($res) {
-        #     $job->permanent_failure($res);
-        # }
-
+        # Rebuild the file.
         my $res = _rebuild_from_fileinfo($fi, $output_file_path);
 
         if (defined $res) {
@@ -118,7 +124,8 @@ sub work {
         } else {
             my $error = $mt->publisher->errstr;
             my $errmsg = $mt->translate(
-                "PubOffline: Error rebuilding file [_1]" . $fi->file_path . ": " . $error
+                "PubOffline: Error rebuilding file [_1]" 
+                . $fi->file_path . ": " . $error
             );
             MT::TheSchwartz->debug($errmsg);
             $job->permanent_failure($errmsg);
