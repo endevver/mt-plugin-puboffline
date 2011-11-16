@@ -3,19 +3,6 @@ package PubOffline::Plugin;
 use strict;
 use MT::Util qw( format_ts caturl dirify );
 
-sub load_tasks {
-    my $cfg = MT->config;
-    return {
-        'OfflineBatchCleanUp' => {
-            'label' => 'Cleanup Finished Publish Batches',
-            'frequency' => 1, #3 * 60,
-            'code' => sub { 
-                PubOffline::Plugin->task_cleanup; 
-            }
-        }
-    };
-}
-
 sub task_cleanup {
     my $this = shift;
     require MT::Util;
