@@ -192,12 +192,6 @@ sub _zip_offline {
     }
 }
 
-sub tag_is_offline {
-    my ( $ctx, $args, $cond ) = @_;
-    my $bool = $ctx->stash('__offline_mode');
-    return $bool ? 1 : 0;
-}
-
 #sub send_blogs_to_queue {
 #    my $app = shift;
 #    my ($param) = @_;

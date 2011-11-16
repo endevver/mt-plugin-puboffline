@@ -58,7 +58,7 @@ settings:
 
 tags:
   block:
-    IsOfflineMode?: $PubOffline::PubOffline::Plugin::tag_is_offline
+    IsOfflineMode?: PubOffline::Tags::is_offline
 
 applications:
   cms:
