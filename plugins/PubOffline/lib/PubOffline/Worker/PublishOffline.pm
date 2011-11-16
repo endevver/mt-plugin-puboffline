@@ -8,7 +8,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use MT::FileInfo;
 use MT::PublishOption;
 use MT::Util qw( log_time );
-use File::Copy::Recursive qw(fcopy);
+use PubOffline::Util qw( get_output_path );
 
 sub keep_exit_status_for { 1 }
 
@@ -60,24 +60,26 @@ sub work {
             next;
         }
 
-        my $output_file_path = PubOffline::Plugin::_get_output_path({ 
-            blog_id => $fi->blog_id 
-        });
+        my $output_file_path = get_output_path({ blog_id => $fi->blog_id });
 
-        # First, lets check that the PubOffline output path is somewhere we
-        # can write to.
-        if (!-w $output_file_path) {
-            MT->log({
-                level   => MT->model('log')->ERROR(),
-                blog_id => $fi->blog_id,
-                message => 'PubOffline could not write to the Output File '
-                    . 'Path (' . $output_file_path . ') as specified in the '
-                    . 'plugin Settings. Check folder and user permissions to '
-                    . 'ensure that location is writable.',
-            });
-            
-            # Give up, since we can't write this fine anyway.
-            next;
+        # First, lets check that the PubOffline output path exists
+        if (!-d $output_file_path) {
+
+            # It doesn't exist, so let's create it.
+            require MT::FileMgr;
+            my $fmgr = MT::FileMgr->new('Local')
+                or die MT::FileMgr->errstr;
+
+            # Try to create the output file path specified. If it fails,
+            # record a note in the Activity Log and move on to the next job.
+            $fmgr->mkpath( $output_file_path )
+                or next MT->log({
+                    level   => MT->model('log')->ERROR(),
+                    blog_id => $fi->blog_id,
+                    message => 'PubOffline could not write to the Output File '
+                        . 'Path (' . $output_file_path . ') as specified in the '
+                        . 'plugin Settings. ' . $fmgr->errstr,
+                });
         }
 
         my $blog = MT->model('blog')->load( $fi->blog_id );
@@ -254,17 +256,9 @@ sub _rebuild_from_fileinfo {
         $ctx->{current_timestamp_end} = $end;
     }
 
-    # Set the $arch_root to the specified offline path. $pub->rebuild_file
-    # uses this combined with the filename to create the file that is output.
-    my $arch_root = PubOffline::Plugin::_get_output_path({ blog_id => $blog->id });
-
-    return $pub->error(
-        MT->translate("You did not set your blog publishing path") )
-      unless $arch_root;
-
     my %cond;
 
-    $pub->rebuild_file( $blog, $arch_root, $map, $at, $ctx, \%cond, 1,
+    $pub->rebuild_file( $blog, $output_file_path, $map, $at, $ctx, \%cond, 1,
         FileInfo => $fi, )
       or return;
 
