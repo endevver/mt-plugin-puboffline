@@ -1,0 +1,47 @@
+<mt:setvarblock name="page_title">Publish Offline: Jumpstart Asset Handling</mt:setvarblock>
+<mt:setvarblock name="html_head" append="1"></mt:setvarblock>
+<mt:include name="dialog/header.tmpl">
+
+<form name="send_to_queue" method="post" action="<mt:Var name="script_url">">
+    <input type="hidden" name="__mode" value="po_jumpstart_assets" />
+    <input type="hidden" name="jumpstart" value="1" />
+    <input type="hidden" name="blog_id" value="<mt:Var name="blog_id">" />
+
+<mt:If name="enabled">
+    <p>
+        Begin the Jumpstart to place all assets in this blog in the queue to
+        be handled for the offline blog.
+    </p>
+<mt:Else>
+    <p>
+        It appears that Publish Offline is not enabled on this blog. Publish
+        Offline must be enabled before the Asset Jumpstart can begin. (If you
+        have checked the Enable Publish Offline checkbox then immediately
+        clicked the Jumpstart Asset Handling button, you should save the
+        enabled state before clicking the Jumpstart Asset Handling button.)
+    </p>
+</mt:If>
+
+    <div class="actions-bar">
+        <div class="actions-bar-inner pkg actions">
+<mt:If name="enabled">
+            <button
+                id="continue"
+                type="submit"
+                accesskey="s"
+                class="primary-button"
+                title="Jumpstart"
+                >Jumpstart</button>
+</mt:If>
+            <button
+                onclick="closeDialog(); return false"
+                type="submit"
+                accesskey="x"
+                class="cancel close"
+                title="Close (x)"
+                >Close</button>
+        </div>
+    </div>
+</form>
+
+<mt:Include name="dialog/footer.tmpl">

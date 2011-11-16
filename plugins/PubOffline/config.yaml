@@ -12,65 +12,42 @@ object_types:
     offline_batch_id: integer
 
 callbacks:
-    build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
-    build_page: $PubOffline::PubOffline::Plugin::build_page
-
+    build_file_filter:   PubOffline::Plugin::build_file_filter
+    build_page:          PubOffline::Plugin::build_page
+    cms_post_save.asset: PubOffline::Plugin::cms_post_save_asset
+    cms_upload_file:     PubOffline::Plugin::cms_upload_file
 
 task_workers:
     publish_offline:
         label: "Publishes an offline version of content"
         class: 'PubOffline::Worker::PublishOffline'
-    copy_static_offline:
-        label: "Copies static files into an offline folder"
-        class: 'MT::Worker::CopyStaticOffline'
+    handle_asset:
+        label: 'Handle an asset for the offline version of a blog'
+        class: 'PubOffline::Worker::HandleAsset'
+    # copy_static_offline:
+    #     label: "Copies static files into an offline folder"
+    #     class: 'MT::Worker::CopyStaticOffline'
 
-options:
-    enable_puboffline:
-        label: 'Enable Publish Offline'
-        hint: 'Enable or disable Publish Offline for this blog.'
-        scope: blog
-        type: checkbox
-        order: 1
-    output_file_path:
-        label: 'Output File Path'
-        hint: 'This is the path that Publish Offline will output its files to. This should be an absolute file path; MT tags are allowed, though <a href="http://www.movabletype.org/documentation/appendices/tags/blogsitepath.html" target="_blank">BlogSitePath</a> is likley the only tag you would use.'
-        scope: blog
-        type: text
-        default: '<mt:BlogSitePath>puboffline/'
-        order: 2
-    output_url:
-        label: 'Output URL'
-        hint: 'Enter a URL to the offline version of this web site. If the Output File Path does not reference a web accessible directory, leave this field blank. (The Output URL is supplied with the notification email only.)'
-        scope: blog
-        type: text
-        default: '<mt:BlogURL>puboffline/'
-        order: 3
-
-# Obsolete
 settings:
-  zip:
-    scope: blog
-    default: 0
-  date:
-    scope: blog
-    default: 0
+    enable_puboffline:
+        scope: blog
+        default: 0
+    output_file_path:
+        scope: blog
+        default: '<mt:BlogSitePath>puboffline/'
+    asset_handling:
+        scope: blog
+        default: copy
+
+blog_config_template:
+    code: PubOffline::CMS::settings
 
 tags:
   block:
     IsOfflineMode?: PubOffline::Tags::is_offline
 
 applications:
-  cms:
-    methods:
-      pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue
-
-page_actions:
-  list_templates:
-    pub_offline:
-      label: 'Publish Offline Version'
-      order: 1012
-      dialog: pub_offline
-      permission: publish_post
-      condition: >
-        sub { MT->app->blog; }
-
+    cms:
+        methods:
+            po_jumpstart_assets: PubOffline::CMS::jumpstart_assets
+            #pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue

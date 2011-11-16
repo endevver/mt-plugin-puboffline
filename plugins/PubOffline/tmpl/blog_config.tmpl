@@ -1,0 +1,64 @@
+<mtapp:setting
+    id="enable_puboffline"
+    label_class="left-label"
+    label="<__trans phrase="Enable Publish Offline">">
+    <input type="checkbox"
+        name="enable_puboffline"
+        id="enable_puboffline"
+        value="1"
+        <mt:If name="enable_puboffline">checked="checked"</mt:If> />
+    <label for="enable_puboffline">
+        Enable or disable Publish Offline for this blog.
+    </label>
+</mtapp:setting>
+
+<mtapp:setting
+    id="output_file_path"
+    label_class="left-label"
+    label="<__trans phrase="Offline Output File Path">"
+    hint="This is the path to which Publish Offline will output the offline version of this blog. This should be an absolute file path; MT tags are allowed, though <a href=\"http://www.movabletype.org/documentation/appendices/tags/blogsitepath.html\" target=\"_blank\">BlogSitePath</a> is likley the only tag you would use."
+    show_hint="1">
+    <input type="text"
+        name="output_file_path"
+        value="<mt:Var name="output_file_path" escape="html">"
+        class="ti full-width" />
+</mtapp:setting>
+
+<mtapp:setting
+    id="asset_handling"
+    label_class="left-label"
+    label="<__trans phrase="Asset Handling">"
+    hint="Assets in this blog can be copied to the Offline Output File Path, or hard links to the assets can be created."
+    show_hint="1">
+    <input type="radio"
+        name="asset_handling"
+        id="asset_handling_copy"
+        value="copy"
+        <mt:If name="asset_handling" eq="copy">checked="checked"</mt:If> />
+    <label for="asset_handling_copy">Copy</label>
+    <br />
+    <input type="radio"
+        name="asset_handling"
+        id="asset_handling_hard_link"
+        value="hard_link"
+        <mt:If name="asset_handling" eq="hard_link">checked="checked"</mt:If> />
+    <label for="asset_handling_hard_link">Hard Link</label>
+</mtapp:setting>
+
+<mtapp:setting
+    id="asset_handle_now"
+    label_class="left-label"
+    label="<__trans phrase="Jumpstart Asset Handling">"
+    hint="An asset will be automatically copied or linked when the asset has been modified. However existing assets need a &ldquo;jumpstart&rdquo; to become part of the offline version."
+    show_hint="1">
+
+    <div class="actions-bar" style="clear: none;">
+        <div class="actions-bar-inner pkg actions">
+            <button
+                onclick="return openDialog(false, 'po_jumpstart_assets', 'blog_id=<mt:Var name="blog_id">')"
+                class="primary-button"
+                title="Jumpstart Asset Handling"
+                >Jumpstart Asset Handling</button>
+        </div>
+    </div>
+</mtapp:setting>

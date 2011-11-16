@@ -1,0 +1,216 @@
+package PubOffline::Worker::HandleAsset;
+
+use strict;
+use base qw( TheSchwartz::Worker );
+
+use TheSchwartz::Job;
+use Time::HiRes qw(gettimeofday tv_interval);
+use MT::FileInfo;
+use MT::PublishOption;
+use MT::Util qw( log_time );
+use PubOffline::Util qw( get_output_path );
+use File::Copy::Recursive qw(fcopy);
+
+sub keep_exit_status_for { 1 }
+
+sub work {
+    my $class = shift;
+    my TheSchwartz::Job $job = shift;
+    my $plugin = MT->component('PubOffline');
+
+    # Build this
+    my $mt = MT->instance;
+
+    # reset publish timer; don't republish a file if it has
+    # this or a later timestamp.
+    $mt->publisher->start_time( time );
+
+    # We got triggered to build; lets find coalescing jobs
+    # and process them in one pass.
+
+    my @jobs = ($job);
+    my $job_iter;
+    if (my $key = $job->coalesce) {
+        $job_iter = sub {
+            shift @jobs || MT::TheSchwartz->instance->find_job_with_coalescing_value($class, $key);
+        };
+    }
+    else {
+        $job_iter = sub { shift @jobs };
+    }
+
+    my $start = [gettimeofday];
+    my $rebuilt = 0;
+
+    while (my $job = $job_iter->()) {
+        # Load the job, and use that to get at the asset ID so that the asset
+        # can be loaded.
+        my $mt_job = MT->model('ts_job')->load( $job->jobid );
+        my $asset_id = $job->uniqkey;
+        my $asset = MT->model('asset')->load( $asset_id )
+            or next;
+
+        # If there is no file path for this asset, just move on to the next
+        # job. No file path means this isn't a file-based asset, so there's
+        # nothing for us to do. Also check that the asset exists at that
+        # location; if not there, give up because we can't copy something that
+        # doesn't exist.
+        next if !$asset->file_path || !-e $asset->file_path;
+
+
+        my $output_file_path = get_output_path({ 
+            blog_id => $asset->blog_id,
+        });
+
+        # First, lets check that the PubOffline output path exists
+        if (!-d $output_file_path) {
+
+            # It doesn't exist, so let's create it.
+            require MT::FileMgr;
+            my $fmgr = MT::FileMgr->new('Local')
+                or die MT::FileMgr->errstr;
+
+            # Try to create the output file path specified. If it fails,
+            # record a note in the Activity Log and move on to the next job.
+            $fmgr->mkpath( $output_file_path )
+                or next MT->log({
+                    level   => MT->model('log')->ERROR(),
+                    blog_id => $asset->blog_id,
+                    message => 'PubOffline could not write to the Output File '
+                        . 'Path (' . $output_file_path . ') as specified in the '
+                        . 'plugin Settings. ' . $fmgr->errstr,
+                });
+        }
+
+        # How is this blog supposed to handle assets: copy or hard link?
+        my $pref = $plugin->get_config_value(
+            'asset_handling',
+            'blog:' . $asset->blog_id,
+        );
+
+        my $result;
+
+        if ($pref eq 'hard_link') {
+            $result = _hard_link({
+                output_file_path => $output_file_path,
+                asset            => $asset,
+            });
+        }
+        # Fall back to copying the asset.
+        else {
+            $result = _copy_asset({
+                output_file_path => $output_file_path,
+                asset            => $asset,
+            });
+        }
+
+
+        if (defined $result) {
+            $job->completed();
+            $rebuilt++;
+        } else {
+            # The error was already reported and logged in _hard_link or
+            # _copy_asset so we don't need to do anything.
+        }
+    }
+}
+
+sub grab_for { 60 }
+sub max_retries { 0 }
+sub retry_delay { 60 }
+
+# Copy the asset from the online to offline location. (We're copying based on
+# the plugin Setting for asset handling.)
+sub _copy_asset {
+    my ($arg_refs)       = @_;
+    my $output_file_path = $arg_refs->{output_file_path};
+    my $asset            = $arg_refs->{asset};
+
+    my $blog = MT->model('blog')->load( $asset->blog_id )
+        or return 0;
+
+    my $blog_site_path = $blog->site_path;
+    $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
+
+    # Create a relative path that can be used to properly create the online
+    # and offline paths.
+    my $rel_file_path = $asset->file_path;
+    $rel_file_path =~ s/$blog_site_path//;
+
+    my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
+    my $dest   = File::Spec->catfile($output_file_path, $rel_file_path);
+    
+    # Finally, copy the asset.
+    MT->log("Copying $source to $dest.");
+    my $result = fcopy( $source, $dest );
+
+    if (!$result) {
+        my $errmsg = MT->translate(
+            "PubOffline: Error copying asset ID [_1] ([_2]) to target "
+                . "directory: [_3]", 
+            $asset->id,
+            $source, 
+            $dest
+        );
+        MT::TheSchwartz->debug($errmsg);
+        MT->log({
+            blog_id => $asset->blog_id,
+            message => $errmsg,
+            level   => MT::Log::ERROR(),
+        });
+    }
+
+    return 1;
+}
+
+# Create a hard link of the asset from the online to offline location. (We're
+# creating the hard link based on the plugin Setting for asset handling.)
+sub _hard_link {
+    my ($arg_refs)       = @_;
+    my $output_file_path = $arg_refs->{output_file_path};
+    my $asset            = $arg_refs->{asset};
+
+    my $blog = MT->model('blog')->load( $asset->blog_id )
+        or return 0;
+
+    my $blog_site_path = $blog->site_path;
+    $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
+
+    # Create a relative path that can be used to properly create the online
+    # and offline paths.
+    my $rel_file_path = $asset->file_path;
+    $rel_file_path =~ s/$blog_site_path//;
+
+    my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
+    my $dest   = File::Spec->catfile($output_file_path, $rel_file_path);
+
+    # If the link already exists we can just give up -- since the link exists
+    # it already points to the latest data. (It's also worth noting that 
+    # creating a link when a link already exists just throws an error.)
+    return 1 if -e $dest;
+
+    # Create the hard link.
+    my $result = link( $source, $dest );
+
+    if (!$result) {
+        my $errmsg = MT->translate(
+            "PubOffline: Error creating hard link for asset ID [_1] ([_2]) "
+                . "to target directory: [_3]", 
+            $asset->id,
+            $source, 
+            $dest
+        );
+        MT::TheSchwartz->debug($errmsg);
+        MT->log({
+            blog_id => $asset->blog_id,
+            message => $errmsg,
+            level   => MT::Log::ERROR(),
+        });
+    }
+
+    return 1;
+}
+
+1;
+
+__END__

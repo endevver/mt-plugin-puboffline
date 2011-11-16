@@ -645,14 +645,80 @@ sub _get_job_priority {
     return $priority;
 }
 
+# After saving an asset we want to be sure it gets copied offline.
+sub cms_post_save_asset {
+    my ($cb, $app, $asset, $original_asset) = @_;
     my $plugin = MT->component('PubOffline');
 
+    # We want to give up if PubOffline was not enabled on this blog.
+    my $enabled = $plugin->get_config_value(
+        'enable_puboffline',
+        'blog:' . $asset->blog_id
+    );
+    return if !$enabled;
+
+    _create_asset_handling_job( $asset );
+}
+
+# When uploading a file, we want to be sure it gets copied offline.
+sub cms_upload_file {
+    my ($cb, %params) = @_;
+    my $plugin = MT->component('PubOffline');
+
+    # We want to give up if PubOffline was not enabled on this blog.
+    my $enabled = $plugin->get_config_value(
+        'enable_puboffline',
+        'blog:' . $params{blog}
+    );
+    return if !$enabled;
+
+    _create_asset_handling_job( $params{asset} );
+}
+
+# Create a The Schwartz job for an asset.
+sub _create_asset_handling_job {
+    my ($asset) = @_;
+
+    # Ok, let's build the Schwartz Job.
+    require MT::TheSchwartz;
+    my $ts = MT::TheSchwartz->instance();
+
+    my $func_id = $ts->funcname_to_id(
+        $ts->driver_for,
+        $ts->shuffled_databases,
+        'PubOffline::Worker::HandleAsset'
     );
 
+    # Look for a job that has these parameters.
+    my $job = MT->model('ts_job')->load({
+        funcid  => $func_id,
+        uniqkey => $asset->id,
+    });
 
+    unless ($job) {
+        $job = MT->model('ts_job')->new();
+        $job->funcid( $func_id );
+        $job->uniqkey( $asset->id );
+    }
 
+    my $priority = 10;
 
+    $job->priority( $priority );
+    $job->grabbed_until(1);
+    $job->run_after(1);
+    $job->coalesce( 
+        ( $asset->blog_id || 0 ) 
+        . ':' . $$ 
+        . ':' . $priority 
+        . ':' . ( time - ( time % 10 ) ) 
+    );
 
+    $job->save or MT->log({
+        blog_id => $asset->blog_id,
+        level   => MT::Log::ERROR(),
+        message => "Could not queue Publish Offline asset handler: " 
+            . $job->errstr
+    });
 }
 
 1;
