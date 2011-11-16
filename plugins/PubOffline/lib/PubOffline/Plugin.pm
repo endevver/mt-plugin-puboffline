@@ -608,29 +608,6 @@ sub build_page {
     }
 }
 
-sub _create_copy_static_job {
-    my ($batch) = @_;
-
-    # Ok, let's build the Schwartz Job.
-    require MT::TheSchwartz;
-    my $ts = MT::TheSchwartz->instance();
-    my $func_id = $ts->funcname_to_id($ts->driver_for,
-                                      $ts->shuffled_databases,
-                                      'MT::Worker::CopyStaticOffline');
-    my $job = MT->model('ts_job')->new();
-    $job->funcid( $func_id );
-    $job->uniqkey( $batch->id );
-    $job->offline_batch_id( $batch->id );
-    $job->priority( 9 );
-    $job->grabbed_until(1);
-    $job->run_after(1);
-    $job->coalesce( ( $batch->blog_id || 0 ) . ':' . $$ . ':' . 9 . ':' . ( time - ( time % 10 ) ) );
-    $job->save or MT->log({
-        blog_id => $batch->blog_id,
-        message => "PubOffline: could not queue copy static job: " . $job->errstr
-    });
-}
-
 sub _get_job_priority {
     my ($fi) = @_;
     my $priority = 0;
@@ -681,3 +658,26 @@ sub _get_job_priority {
 1;
 
 __END__
+
+sub _create_copy_static_job {
+    my ($batch) = @_;
+
+    # Ok, let's build the Schwartz Job.
+    require MT::TheSchwartz;
+    my $ts = MT::TheSchwartz->instance();
+    my $func_id = $ts->funcname_to_id($ts->driver_for,
+                                      $ts->shuffled_databases,
+                                      'MT::Worker::CopyStaticOffline');
+    my $job = MT->model('ts_job')->new();
+    $job->funcid( $func_id );
+    $job->uniqkey( $batch->id );
+    $job->offline_batch_id( $batch->id );
+    $job->priority( 9 );
+    $job->grabbed_until(1);
+    $job->run_after(1);
+    $job->coalesce( ( $batch->blog_id || 0 ) . ':' . $$ . ':' . 9 . ':' . ( time - ( time % 10 ) ) );
+    $job->save or MT->log({
+        blog_id => $batch->blog_id,
+        message => "PubOffline: could not queue copy static job: " . $job->errstr
+    });
+}
