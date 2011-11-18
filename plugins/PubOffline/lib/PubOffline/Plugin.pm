@@ -374,7 +374,7 @@ sub build_file_filter {
         'enable_puboffline',
         'blog:' . $fi->blog_id
     );
-    return if !$enabled;
+    return 1 if !$enabled;
 
     # This first block of code checks to see if the file being republished is
     # coming from the PubOffline::Worker::PublishOffline worker. If it is,
