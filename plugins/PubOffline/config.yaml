@@ -4,12 +4,6 @@ description: "This plugin allows administrators to publish a version of their si
 author_name: Endevver
 author_link: http://endevver.com
 version: 0.8
-schema_version: 3
-
-object_types:
-  offline_batch: 'PubOffline::OfflineBatch'
-  ts_job:
-    offline_batch_id: integer
 
 callbacks:
     build_file_filter:   PubOffline::Plugin::build_file_filter
@@ -50,4 +44,3 @@ applications:
     cms:
         methods:
             po_jumpstart_assets: PubOffline::CMS::jumpstart_assets
-            #pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue
