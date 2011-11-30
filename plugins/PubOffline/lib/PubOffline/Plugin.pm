@@ -2,7 +2,7 @@ package PubOffline::Plugin;
 
 use strict;
 use MT::Util qw( format_ts caturl dirify );
-use PubOffline::Util qw( get_output_path );
+use PubOffline::Util qw( get_output_path render_template );
 
 sub task_cleanup {
     my $this = shift;
