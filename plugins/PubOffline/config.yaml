@@ -18,9 +18,9 @@ task_workers:
     handle_asset:
         label: 'Handle an asset for the offline version of a blog'
         class: 'PubOffline::Worker::HandleAsset'
-    # copy_static_offline:
-    #     label: "Copies static files into an offline folder"
-    #     class: 'MT::Worker::CopyStaticOffline'
+    handle_static_files:
+         label: "Handle static files for the offline version of a blog"
+         class: 'PubOffline::Worker::HandleStatic'
 
 settings:
     enable_puboffline:
@@ -32,15 +32,21 @@ settings:
     asset_handling:
         scope: blog
         default: copy
+    static_handling:
+        scope: blog
+        default: none
+    static_manifest:
+        scope: blog
+        default: ''
 
 blog_config_template:
     code: PubOffline::CMS::settings
 
 tags:
-  block:
-    IsOfflineMode?: PubOffline::Tags::is_offline
+    block:
+        IsOfflineMode?: PubOffline::Tags::is_offline
 
 applications:
     cms:
         methods:
-            po_jumpstart_assets: PubOffline::CMS::jumpstart_assets
+            po_jumpstart: PubOffline::CMS::jumpstart

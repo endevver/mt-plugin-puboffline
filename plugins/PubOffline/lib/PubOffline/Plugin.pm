@@ -541,29 +541,115 @@ sub _create_asset_handling_job {
     });
 }
 
-1;
+# Use the Static Manifest Field to decide what static content needs to be
+# handled.
+sub _create_static_handling_jobs {
+    my $blog_id = @_;
+    my $plugin = MT->component('PubOffline');
 
-__END__
+    # Just give up if static files are not required.
+    my $static_handling = $plugin->get_config_value(
+        'static_handling',
+        'blog:' . $blog_id,
+    );
+    return if $static_handling eq 'none';
 
-sub _create_copy_static_job {
-    my ($batch) = @_;
+    # Grab the static manifest, which is used to determine what content is
+    # needed.
+    my $static_manifest = $plugin->get_config_value(
+        'static_manifest',
+        'blog:' . $blog_id,
+    );
+
+    if ($static_manifest) {
+        # The manifest can contain many paths, each on their own line. Split
+        # on the new line and put them into an array so they can be processed.
+        # Also, chop off any leading or trailing white space.
+        my @paths = split(/\s*[\r\n]\s*/, $static_manifest);
+
+        foreach my $path (@paths) {
+            # If a template tag was used in specifying the path we want to
+            # render it before trying to use the path.
+            $path = render_template({
+                blog_id => $blog_id,
+                text    => $path,
+            });
+
+            # Check that the path exists and give up if it doesn't.
+            next if !-e $path;
+
+            # Create a static handling job for this path.
+            _create_static_handling_job({
+                path    => $path,
+                blog_id => $blog_id,
+            });
+        }
+    }
+
+    # No static manifest details were specified, which means we want all
+    # static content to be copied or linked.
+    else {
+        my $static_file_path = MT->config('StaticFilePath');
+
+        _create_static_handling_job({
+            path    => $static_file_path,
+            blog_id => $blog_id,
+        });
+    }
+}
+
+# Create a Schwartz job to copy or link the static content. If the Static File
+# Manifest field was used, the user can specify what static content is needed
+# and we can create a separate job for each of the items they specify, so
+# multiple static handling jobs may be created.
+sub _create_static_handling_job {
+    my ($arg_ref) = @_;
+    my $path    = $arg_ref->{path};
+    my $blog_id = $arg_ref->{blog_id};
 
     # Ok, let's build the Schwartz Job.
     require MT::TheSchwartz;
     my $ts = MT::TheSchwartz->instance();
     my $func_id = $ts->funcname_to_id($ts->driver_for,
                                       $ts->shuffled_databases,
-                                      'MT::Worker::CopyStaticOffline');
-    my $job = MT->model('ts_job')->new();
-    $job->funcid( $func_id );
-    $job->uniqkey( $batch->id );
-    $job->offline_batch_id( $batch->id );
-    $job->priority( 9 );
+                                      'PubOffline::Worker::HandleStatic');
+
+
+    # Look for a job that has these parameters.
+    my $job = MT->model('ts_job')->load({
+      funcid  => $func_id,
+      uniqkey => $path,
+    });
+
+    unless ($job) {
+      $job = MT->model('ts_job')->new();
+      $job->funcid( $func_id );
+      # The unique key is the path to the static files to be handled. This could
+      # be the `<mt:StaticFilePath>`, or it could be a subdirectory or file,
+      # such as `<mt:StaticFilePath/support/plugins/my-awesome-plugin/`.
+      $job->uniqkey( $path );
+    }
+
+    $job->priority( 10 );
     $job->grabbed_until(1);
     $job->run_after(1);
-    $job->coalesce( ( $batch->blog_id || 0 ) . ':' . $$ . ':' . 9 . ':' . ( time - ( time % 10 ) ) );
+    $job->coalesce( 
+        $blog_id
+        . ':' . $$ 
+        . ':' . 10 
+        . ':' 
+        . ( time - ( time % 10 ) ) 
+    );
+
     $job->save or MT->log({
-        blog_id => $batch->blog_id,
-        message => "PubOffline: could not queue copy static job: " . $job->errstr
+        blog_id => $blog_id,
+        level   => MT::Log::ERROR(),
+        message => "Could not queue Publish Offline static handler: " 
+            . $job->errstr,
     });
 }
+
+1;
+
+__END__
+

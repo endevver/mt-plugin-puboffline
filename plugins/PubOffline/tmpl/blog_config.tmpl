@@ -46,10 +46,51 @@
 </mtapp:setting>
 
 <mtapp:setting
-    id="asset_handle_now"
+    id="static_handling"
     label_class="left-label"
-    label="<__trans phrase="Jumpstart Asset Handling">"
-    hint="An asset will be automatically copied or linked when the asset has been modified. However existing assets need a &ldquo;jumpstart&rdquo; to become part of the offline version."
+    label="<__trans phrase="Static File Handling">"
+    hint="Movable Type's static content is sometimes required for a theme or for assets handled by the system, for example. If the static files are needed, you'll want them in the offline version of this blog, too. Static files can be copied to the Offline Output File Path, or hard links to the files can be created."
+    show_hint="1">
+    <input type="radio"
+        name="static_handling"
+        id="static_handling_none"
+        value="none"
+        <mt:If name="static_handling" eq="none">checked="checked"</mt:If> />
+    <label for="static_handling_none">Not required</label>
+    <br />
+    <input type="radio"
+        name="static_handling"
+        id="static_handling_copy"
+        value="copy"
+        <mt:If name="static_handling" eq="copy">checked="checked"</mt:If> />
+    <label for="static_handling_copy">Copy</label>
+    <br />
+    <input type="radio"
+        name="static_handling"
+        id="static_handling_hard_link"
+        value="hard_link"
+        <mt:If name="static_handling" eq="hard_link">checked="checked"</mt:If> />
+    <label for="static_handling_hard_link">Hard Link</label>
+</mtapp:setting>
+
+<mtapp:setting
+    id="static_manifest"
+    label_class="left-label"
+    label="<__trans phrase="Static File Manifest">"
+    hint="If static files should be copied offline, a manifest can help ensure that only the pertinent files are copied or linked. Leave this textarea empty to copy/link all static content. Alternatively, specify an absolute path to a file or folder. Specify additional files or folders on separate lines. The template tag <a href=\"http://www.movabletype.org/documentation/appendices/tags/staticfilepath.html\" target=\"_blank\">StaticFilePath</a> can be helpful in specifying content you want in the offline version."
+    show_hint="1">
+    <textarea
+        id="static_manifest"
+        name="static_manifest"
+        rows="5"
+        class="full-width"><mt:Var name="static_manifest" escape="html"></textarea>
+</mtapp:setting>
+
+<mtapp:setting
+    id="jumpstart"
+    label_class="left-label"
+    label="<__trans phrase="Jumpstart Asset and Static File Handling">"
+    hint="An asset will be automatically copied or linked when the asset has been modified. However existing assets need a &ldquo;jumpstart&rdquo; to become part of the offline version. Similarly, static content will be copied during an upgrade but existing content needs a &ldquo;jumpstart&rdquo; to become part of the offline version."
     show_hint="1">
 
     <div class="actions-bar" style="clear: none;">
