@@ -89,8 +89,8 @@
 <mtapp:setting
     id="jumpstart"
     label_class="left-label"
-    label="<__trans phrase="Jumpstart Asset and Static File Handling">"
-    hint="An asset will be automatically copied or linked when the asset has been modified. However existing assets need a &ldquo;jumpstart&rdquo; to become part of the offline version. Similarly, static content will be copied during an upgrade but existing content needs a &ldquo;jumpstart&rdquo; to become part of the offline version."
+    label="<__trans phrase="Jumpstart this Blog">"
+    hint="An asset will be automatically copied or linked when the asset has been modified. However existing assets need a &ldquo;jumpstart&rdquo; to become part of the offline version. Similarly, static content will be copied during an upgrade but existing content needs a &ldquo;jumpstart&rdquo; to become part of the offline version. Additionally, the jumpstart will publish templates offline."
     show_hint="1">
 
     <div class="actions-bar" style="clear: none;">
@@ -98,8 +98,9 @@
             <button
                 onclick="return openDialog(false, 'po_jumpstart', 'blog_id=<mt:Var name="blog_id">')"
                 class="primary-button"
+                style="padding-bottom: 4px;"
                 title="Jumpstart Asset and Static File Handling"
-                >Jumpstart Asset and Static File Handling</button>
+                >Jumpstart this Blog</button>
         </div>
     </div>
 </mtapp:setting>

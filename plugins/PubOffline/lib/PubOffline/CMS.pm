@@ -53,6 +53,16 @@ sub jumpstart {
         # Jumpstart static files
         PubOffline::Plugin::_create_static_handling_jobs( $blog_id );
 
+        # Jumpstart templates: indexes and archives.
+        my $iter = MT->model('fileinfo')->load_iter({
+            blog_id => $blog_id,
+        });
+
+        while ( my $fi = $iter->() ) {
+            # Create a Schwartz job for each file that needs to be published.
+            PubOffline::Plugin::_create_publish_job( $fi );
+        }
+
         return $plugin->load_tmpl( 'dialog/close.tmpl' );
     }
 
