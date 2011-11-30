@@ -29,6 +29,9 @@ settings:
     output_file_path:
         scope: blog
         default: '<mt:BlogSitePath>puboffline/'
+    root_relative_url:
+        scope: blog
+        default: 0
     asset_handling:
         scope: blog
         default: copy

@@ -25,6 +25,22 @@
 </mtapp:setting>
 
 <mtapp:setting
+    id="root_relative_url"
+    label_class="left-label"
+    label="<__trans phrase="Try to use Root Relative URLs">"
+    hint="The Blog URL and Static Web Path are used to create relative links within the offline files. If you specify root relative URLs within entries (that is, URLs without the protocol or domain) then you probably want to enable this feature. Note that this feature is experimental in that if your URL is not unique enough to be identified as a root relative URL, you may see unexpected results in the links created for the offline files."
+    show_hint="1">
+    <input type="checkbox"
+        name="root_relative_url"
+        id="root_relative_url"
+        value="1"
+        <mt:If name="root_relative_url">checked="checked"</mt:If>>
+    <label for="root_relative_url">
+        Try to use root relative URLs in the offline version.
+    </label>
+</mtapp:setting>
+
+<mtapp:setting
     id="asset_handling"
     label_class="left-label"
     label="<__trans phrase="Asset Handling">"

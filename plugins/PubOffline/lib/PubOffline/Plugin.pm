@@ -323,7 +323,25 @@ sub build_page {
 
     # Content is the actual rendered page HTML. Search it for the $pattern to
     # create a relative directory.
-    my $pattern = $blog->site_url;
+    my $blog_site_url = $blog->site_url;
+    my $pattern = $blog_site_url;
+
+    # Try to use root relative URLs for the offline version of this blog?
+    my $root_relative_url_enabled = $plugin->get_config_value(
+        'root_relative_url',
+        'blog:'.$blog->id
+    );
+
+    if ( $root_relative_url_enabled ) {
+        # Create a root relative URL by removing the protocol and domain name.
+        my $root_relative_url = $blog->site_url;
+        $root_relative_url =~ s/^https?\:\/\/[^\/]*//i;
+
+        # The pattern should include both the blog site url and the root
+        # relative URL.
+        $pattern = "($blog_site_url|$root_relative_url)";
+    }
+
     my $content = $args{'Content'};
 
     # Static content may be specified with StaticWebPath or
@@ -332,9 +350,13 @@ sub build_page {
     # from the default.
     require MT::Template::ContextHandlers;
     my ($static_pattern, $static_pattern_a, $static_pattern_b);
-    $static_pattern_a = $static_pattern_b 
+    $static_pattern_a = $static_pattern_b
         = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
+
+    # Pattern A is the complete URL of the static path. Pattern B is a root
+    # relative URL.
     $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
+    # Look for either pattern A or B.
     $static_pattern = "($static_pattern_a|$static_pattern_b)";
 
     # If the file is not at the root, (that is, there were directories
