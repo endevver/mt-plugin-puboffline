@@ -1,13 +1,11 @@
 package PubOffline::Worker::HandleAsset;
 
 use strict;
+use warnings;
 use base qw( TheSchwartz::Worker );
 
 use TheSchwartz::Job;
 use Time::HiRes qw(gettimeofday tv_interval);
-use MT::FileInfo;
-use MT::PublishOption;
-use MT::Util qw( log_time );
 use PubOffline::Util qw( get_output_path );
 use File::Copy::Recursive qw(fcopy);
 
@@ -91,7 +89,7 @@ sub work {
         my $result;
 
         if ($pref eq 'hard_link') {
-            $result = _hard_link({
+            $result = _hard_link_asset({
                 output_file_path => $output_file_path,
                 asset            => $asset,
             });
@@ -141,7 +139,6 @@ sub _copy_asset {
     my $dest   = File::Spec->catfile($output_file_path, $rel_file_path);
     
     # Finally, copy the asset.
-    MT->log("Copying $source to $dest.");
     my $result = fcopy( $source, $dest );
 
     if (!$result) {
@@ -165,7 +162,7 @@ sub _copy_asset {
 
 # Create a hard link of the asset from the online to offline location. (We're
 # creating the hard link based on the plugin Setting for asset handling.)
-sub _hard_link {
+sub _hard_link_asset {
     my ($arg_refs)       = @_;
     my $output_file_path = $arg_refs->{output_file_path};
     my $asset            = $arg_refs->{asset};

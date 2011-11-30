@@ -186,6 +186,7 @@ sub _rebuild_from_fileinfo {
       );
 
 
+    # Index templates get handled a little differently than archives.
     if ( $at eq 'index' ) {
         my $tmpl = MT->model('template')->load( $fi->template_id );
 

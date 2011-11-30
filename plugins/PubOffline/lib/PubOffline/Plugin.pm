@@ -297,9 +297,14 @@ sub build_page {
     # needs to point to create the relative link.
     my $output_file_path = get_output_path({ blog_id => $blog->id });
 
-    # First determine if the current file is at the root of the blog
+    # First determine if the current file is at the root of the blog by making
+    # the file path relative. To do that, try stripping off the output file
+    # path and the blog site path. (The output file path will be in use for
+    # archive templates, while the blog site path will be used for index
+    # templates.)
     my $file_path = $fi->file_path;
-    $file_path =~ s/$output_file_path//;
+    $file_path =~ s/($output_file_path|$blog_site_path)//;
+
     my ($vol, $dirs_path, $file) = File::Spec->splitpath($file_path);
     my @dirs = File::Spec->splitdir( $dirs_path );
 
@@ -326,7 +331,7 @@ sub build_page {
     # any other URL because StaticWebPath may be in the BlogURL, but different
     # from the default.
     require MT::Template::ContextHandlers;
-    my ($static_pattern,$static_pattern_a,$static_pattern_b);
+    my ($static_pattern, $static_pattern_a, $static_pattern_b);
     $static_pattern_a = $static_pattern_b 
         = MT::Template::Context::_hdlr_static_path( $args{'Context'} );
     $static_pattern_b =~ s/^https?\:\/\/[^\/]*//i;
@@ -338,9 +343,9 @@ sub build_page {
     if ( scalar @dirs >= 1 ) {
         # print STDERR "Static path needs to be made relative.\n";
         $$content =~ s{$static_pattern([^"'\)]*)(["'\)])}{
-            ($vol, $dirs_path, $file) = File::Spec->splitpath($2);
-            @dirs = File::Spec->splitdir( $dirs_path );
-            my $path = caturl(@reldirs, 'static', @dirs, $file);
+            my (undef, $static_dirs_path, $static_file) = File::Spec->splitpath($2);
+            my @static_dirs = File::Spec->splitdir( $static_dirs_path );
+            my $path = caturl(@reldirs, 'static', @static_dirs, $static_file);
             $path . $3;
         }emgx;
     }
@@ -384,7 +389,6 @@ sub build_page {
 
             ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
             @dirs = File::Spec->splitdir( $dirs_path );
-#                unshift @dirs, '..';
             my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
             my $path = caturl($new_dirs_path, $file);
             #print STDERR "Path will be $path\n";
@@ -537,7 +541,7 @@ sub _create_asset_handling_job {
         blog_id => $asset->blog_id,
         level   => MT::Log::ERROR(),
         message => "Could not queue Publish Offline asset handler: " 
-            . $job->errstr
+            . $job->errstr,
     });
 }
 
