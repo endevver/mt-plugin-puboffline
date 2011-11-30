@@ -1,16 +1,16 @@
-<mt:setvarblock name="page_title">Publish Offline: Jumpstart Asset Handling</mt:setvarblock>
+<mt:setvarblock name="page_title">Publish Offline: Jumpstart Asset and Static File Handling</mt:setvarblock>
 <mt:setvarblock name="html_head" append="1"></mt:setvarblock>
 <mt:include name="dialog/header.tmpl">
 
 <form name="send_to_queue" method="post" action="<mt:Var name="script_url">">
-    <input type="hidden" name="__mode" value="po_jumpstart_assets" />
+    <input type="hidden" name="__mode" value="po_jumpstart" />
     <input type="hidden" name="jumpstart" value="1" />
     <input type="hidden" name="blog_id" value="<mt:Var name="blog_id">" />
 
 <mt:If name="enabled">
     <p>
         Begin the Jumpstart to place all assets in this blog in the queue to
-        be handled for the offline blog.
+        be handled for the offline version.
     </p>
 <mt:Else>
     <p>
