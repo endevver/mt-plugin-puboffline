@@ -1,7 +1,12 @@
 <mt:include name="dialog/header.tmpl">
+
 <script type="text/javascript">
 /* <![CDATA[ */
-closeDialog();
+    closeDialog();
+<mt:If name="redirect">
+    window.parent.location = '<mt:Var name="redirect">';
+</mt:If>
 /* ]]> */
 </script>
+
 <mt:include name="dialog/footer.tmpl">

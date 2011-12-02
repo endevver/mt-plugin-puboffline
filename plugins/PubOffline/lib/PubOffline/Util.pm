@@ -5,7 +5,10 @@ use warnings;
 
 use base 'Exporter';
 
-our @EXPORT_OK = qw( get_output_path render_template );
+our @EXPORT_OK = qw( 
+    get_output_path get_output_url get_archive_path render_template 
+    path_exists
+);
 
 # The output file path is set in the plugin's Settings, and can contain MT
 # tags. If the output file path contains any MT tags, we want to render those
@@ -15,31 +18,79 @@ sub get_output_path {
     my $blog_id = $arg_refs->{blog_id};
     my $plugin = MT->component('PubOffline');
 
-    # If the output file path contains any MT tags, we want to render
-    # those before trying to use output_file_path.
-    my $output_file_path = $plugin->get_config_value(
+    my $path = $plugin->get_config_value(
         'output_file_path',
         'blog:' . $blog_id
     );
 
     # Add a trailing slash, if needed.
-    $output_file_path = $output_file_path . '/' if $output_file_path !~ /\/$/;
+    $path = $path . '/' if $path !~ /\/$/;
 
-    # If a template tag was used in the output file path, we want it rendered.
-    $output_file_path = render_template({
+    # If a template tag was used here, we want it rendered.
+    $path = render_template({
         blog_id => $blog_id,
-        text    => $output_file_path,
+        text    => $path,
     });
 
-    return $output_file_path;
+    return $path;
+}
+
+# The output file URL is set in the plugin's Settings, and can contain MT
+# tags. If the output file URL contains any MT tags, we want to render those
+# before trying to use it.
+sub get_output_url {
+    my ($arg_refs) = @_;
+    my $blog_id = $arg_refs->{blog_id};
+    my $plugin = MT->component('PubOffline');
+
+    my $url = $plugin->get_config_value(
+        'output_file_url',
+        'blog:' . $blog_id
+    );
+
+    # Add a trailing slash, if needed.
+    $url = $url . '/' if $url !~ /\/$/;
+
+    # If a template tag was used here, we want it rendered.
+    $url = render_template({
+        blog_id => $blog_id,
+        text    => $url,
+    });
+
+    return $url;
+}
+
+# The offline archive file path is set in the plugin's Settings, and can
+# contain MT tags. If the output file path contains any MT tags, we want to
+# render those before trying to use it.
+sub get_archive_path {
+    my ($arg_refs) = @_;
+    my $blog_id = $arg_refs->{blog_id};
+    my $plugin = MT->component('PubOffline');
+
+    my $path = $plugin->get_config_value(
+        'offline_archives_path',
+        'blog:' . $blog_id
+    );
+
+    # Add a trailing slash, if needed.
+    $path = $path . '/' if $path !~ /\/$/;
+
+    # If a template tag was used here, we want it rendered.
+    $path = render_template({
+        blog_id => $blog_id,
+        text    => $path,
+    });
+
+    return $path;
 }
 
 # Template tags can be specified in the plugin Settings. Render them before
 # trying to use them.
 sub render_template {
     my ($arg_refs) = @_;
-    my $blog_id = $arg_refs->{blog_id};
-    my $text    = $arg_refs->{text};
+    my $blog_id    = $arg_refs->{blog_id};
+    my $text       = $arg_refs->{text};
 
     use MT::Template::Context;
     my $ctx = MT::Template::Context->new;

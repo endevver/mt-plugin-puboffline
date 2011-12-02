@@ -1,0 +1,128 @@
+<mt:SetVar name="page_title" value="Manage Offline Archives">
+<mt:SetVarBlock name="html_head" append="1">
+    <script type="text/javascript"><!--
+        var tableSelect;
+        function init() {
+            tableSelect = new TC.TableSelect("listing-table");
+            tableSelect.rowSelect = true;
+        }
+        TC.attachLoadEvent(init);
+    --></script>
+</mt:SetVarBlock>
+
+<mt:SetVarBlock name="system_msg">
+    <mt:If name="create_archive">
+        <mtapp:statusmsg
+            id="create_archive"
+            class="success">
+            An offline archive has been entered into the queue to be created.
+        </mtapp:statusmsg>
+    </mt:If>
+    <mt:If name="deleted_archive">
+        <mtapp:statusmsg
+            id="deleted_archive"
+            class="success">
+            The selected archive has been successfully deleted.
+        </mtapp:statusmsg>
+    </mt:If>
+    <mt:If name="failed_delete">
+        <mtapp:statusmsg
+            id="failed_delete"
+            class="error">
+            The selected offline archive could not be deleted. 
+            <mt:Var name="failed_delete">
+        </mtapp:statusmsg>
+    </mt:If>
+</mt:SetVarBlock>
+
+<mt:SetVarBlock name="html_body_footer">
+    <mt:Include name="include/display_options.tmpl">
+</mt:SetVarBlock>
+
+<mt:Include name="include/header.tmpl" screen_class="listing-screen">
+
+<div style="margin: 10px 10px 20px;">
+    <p>
+        Publish Offline is creating the offline version of this blog at
+        <code><mt:Var name="output_file_path"></code>.<br />
+        <mt:If name="output_file_url">The offline version is publicly visible at
+        <a href="<mt:Var name="output_file_url">" 
+            target="_blank"><mt:Var name="output_file_url"></a>.</mt:If>
+    </p>
+
+    <div class="actions-bar">
+        <div class="actions-bar-inner pkg actions">
+            <button
+                onclick="return openDialog(false, 'po_create_archive', 'blog_id=<mt:Var name="blog_id">')"
+                class="primary-button"
+                style="padding-bottom: 4px;"
+                title="Create an Archive of the Offline Version"
+                >Create an Offline Archive</button>
+        </div>
+    </div>
+</div>
+
+<div class="listing" style="background: #f3f6f9; border-top: 1px solid #cddee7">
+    <div id="actions-bar-top" class="actions-bar actions-bar-top" 
+        style="display: block; border: none; padding: 0;">
+        <div class="actions-bar-inner pkg">
+            <span class="button-actions actions">
+                <a href="javascript:void(0)"
+                     onclick="doForMarkedInThisWindow(
+                         getByID('listing-form'),
+                         'archive', 'archives', 'id', 'po_delete_archive'); 
+                         return false;"
+                     title="Delete Archive">Delete</a>
+            </span>
+        </div>
+    </div>
+</div>
+
+<mtapp:Listing loop="offline_archives" 
+    default="No Offline Archives could be found." 
+    empty_message="No Offline Archives could be found."
+    hide_pager="1"
+    show_actions="1">
+    <mt:If name="__first__">
+        <thead>
+            <tr>
+                <th class="cb">
+                    <input type="checkbox" 
+                        id="select-all-checkbox" 
+                        name="id-head" 
+                        value="all" 
+                        class="select" />
+                </th>
+                <th class="filename">Filename</th>
+                <th class="date">Created</th>
+                <th class="size">Size</th>
+            </tr>
+        </thead>
+        <tbody>
+    </mt:If>
+            <tr class="<mt:If name="__odd__">odd<mt:Else>even</mt:If>">
+                <td class="cb">
+                    <input type="checkbox" 
+                        name="id" 
+                        value="<mt:Var name="file_path">" 
+                        class="select" />
+                </td>
+                <td class="filename">
+                    <a href="<mt:Var name="script_uri">?__mode=po_dl_archive&amp;file=<mt:Var name="file_path">" 
+                        title="Download archive" 
+                        target="_blank">
+                        <mt:Var name="file_name">
+                    </a>
+                </td>
+                <td class="date">
+                    <span title="<mt:Var name="date">">
+                        <mt:Var name="date">
+                    </span>
+                </td>
+                <td class="size">
+                    <mt:Var name="size">
+                </td>
+            </tr>
+</mtapp:listing>
+
+<mt:Include name="include/footer.tmpl">

@@ -173,7 +173,6 @@ sub work {
             });
         }
     }
-
 }
 
 sub grab_for { 60 }

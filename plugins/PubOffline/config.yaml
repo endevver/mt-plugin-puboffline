@@ -13,14 +13,17 @@ callbacks:
 
 task_workers:
     publish_offline:
-        label: "Publishes an offline version of content"
+        label: 'Publishes an offline version of content'
         class: 'PubOffline::Worker::PublishOffline'
     handle_asset:
         label: 'Handle an asset for the offline version of a blog'
         class: 'PubOffline::Worker::HandleAsset'
     handle_static_files:
-         label: "Handle static files for the offline version of a blog"
+         label: 'Handle static files for the offline version of a blog'
          class: 'PubOffline::Worker::HandleStatic'
+    offline_archive:
+        label: 'Creates a zip archive of the offline version of a blog'
+        class: 'PubOffline::Worker::OfflineArchive'
 
 settings:
     enable_puboffline:
@@ -29,6 +32,12 @@ settings:
     output_file_path:
         scope: blog
         default: '<mt:BlogSitePath>puboffline/'
+    output_file_url:
+        scope: blog
+        default: '<mt:BlogURL>puboffline/'
+    offline_archives_path:
+        scope: blog
+        default: '<mt:BlogSitePath>puboffline-archives/'
     root_relative_url:
         scope: blog
         default: 0
@@ -51,5 +60,10 @@ tags:
 
 applications:
     cms:
+        menus: $PubOffline::PubOffline::CMS::menus
         methods:
-            po_jumpstart: PubOffline::CMS::jumpstart
+            po_jumpstart:      PubOffline::CMS::jumpstart
+            po_manage:         PubOffline::CMS::manage
+            po_create_archive: PubOffline::CMS::create_archive
+            po_dl_archive:     PubOffline::CMS::download_archive
+            po_delete_archive: PubOffline::CMS::delete_archive

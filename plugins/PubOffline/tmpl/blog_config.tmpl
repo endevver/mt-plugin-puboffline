@@ -16,11 +16,35 @@
     id="output_file_path"
     label_class="left-label"
     label="<__trans phrase="Offline Output File Path">"
-    hint="This is the path to which Publish Offline will output the offline version of this blog. This should be an absolute file path; MT tags are allowed, though <a href=\"http://www.movabletype.org/documentation/appendices/tags/blogsitepath.html\" target=\"_blank\">BlogSitePath</a> is likley the only tag you would use."
+    hint="This is the path to which Publish Offline will output the offline version of this blog. This should be an absolute file path; MT tags are allowed, though <a href="http://www.movabletype.org/documentation/appendices/tags/blogsitepath.html" target="_blank">BlogSitePath</a> is likley the only tag you would use."
     show_hint="1">
     <input type="text"
         name="output_file_path"
         value="<mt:Var name="output_file_path" escape="html">"
+        class="ti full-width" />
+</mtapp:setting>
+
+<mtapp:setting
+    id="output_file_url"
+    label_class="left-label"
+    label="<__trans phrase="Offline Output File URL">"
+    hint="This is the URL that the offline version is available at. If the Output File Path specified above is outside of the web root and is therefore not available at a URL, this field should be empty. If filled in, this field should contain a fully-qualified domain name; MT tags are allowed, though <a href="http://www.movabletype.org/documentation/appendices/tags/blogurl.html" target="_blank">BlogURL</a> is likley the only tag you would use."
+    show_hint="1">
+    <input type="text"
+        name="output_file_url"
+        value="<mt:Var name="output_file_url" escape="html">"
+        class="ti full-width" />
+</mtapp:setting>
+
+<mtapp:setting
+    id="offline_archives_path"
+    label_class="left-label"
+    label="<__trans phrase="Offline Archives File Path">"
+    hint="This is the path to which Publish Offline will the zip archives of the offline version of this blog. This should be an absolute file path; MT tags are allowed, though <a href="http://www.movabletype.org/documentation/appendices/tags/blogsitepath.html" target="_blank">BlogSitePath</a> is likley the only tag you would use."
+    show_hint="1">
+    <input type="text"
+        name="offline_archives_path"
+        value="<mt:Var name="offline_archives_path" escape="html">"
         class="ti full-width" />
 </mtapp:setting>
 
