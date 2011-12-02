@@ -6,7 +6,7 @@ use base qw( TheSchwartz::Worker );
 
 use TheSchwartz::Job;
 use Time::HiRes qw(gettimeofday tv_interval);
-use PubOffline::Util qw( get_output_path );
+use PubOffline::Util qw( get_output_path path_exists );
 use File::Copy::Recursive qw(fcopy);
 
 sub keep_exit_status_for { 1 }
@@ -60,25 +60,11 @@ sub work {
             blog_id => $asset->blog_id,
         });
 
-        # First, lets check that the PubOffline output path exists
-        if (!-d $output_file_path) {
-
-            # It doesn't exist, so let's create it.
-            require MT::FileMgr;
-            my $fmgr = MT::FileMgr->new('Local')
-                or die MT::FileMgr->errstr;
-
-            # Try to create the output file path specified. If it fails,
-            # record a note in the Activity Log and move on to the next job.
-            $fmgr->mkpath( $output_file_path )
-                or next MT->log({
-                    level   => MT->model('log')->ERROR(),
-                    blog_id => $asset->blog_id,
-                    message => 'PubOffline could not write to the Output File '
-                        . 'Path (' . $output_file_path . ') as specified in the '
-                        . 'plugin Settings. ' . $fmgr->errstr,
-                });
-        }
+        my $result = path_exists({
+            blog_id => $asset->blog_id,
+            path    => $output_file_path,
+        });
+        next if !$result; # Give up if the path wasn't created.
 
         # How is this blog supposed to handle assets: copy or hard link?
         my $pref = $plugin->get_config_value(
@@ -86,8 +72,7 @@ sub work {
             'blog:' . $asset->blog_id,
         );
 
-        my $result;
-
+        $result = undef;
         if ($pref eq 'hard_link') {
             $result = _hard_link_asset({
                 output_file_path => $output_file_path,

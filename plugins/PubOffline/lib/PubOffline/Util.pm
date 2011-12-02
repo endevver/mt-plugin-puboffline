@@ -57,6 +57,41 @@ sub render_template {
     return $result;
 }
 
+# Does the specified path exist? If not, create it.
+sub path_exists {
+    my ($arg_refs) = @_;
+    my $blog_id    = $arg_refs->{blog_id};
+    my $path       = $arg_refs->{path};
+
+    # If the path already exists, then we're done!
+    return 1 if -d $path;
+
+    # It doesn't exist, so let's create it.
+    require MT::FileMgr;
+    my $fmgr = MT::FileMgr->new('Local')
+        or die MT::FileMgr->errstr;
+
+    # Try to create the output file path specified. If it fails,
+    # record a note in the Activity Log and move on to the next job.
+    my $result = $fmgr->mkpath( $path );
+
+    if ($result) {
+        return 1; # Path successfully created.
+    }
+    # Failed creating the path.
+    else {
+        MT->log({
+            level   => MT->model('log')->ERROR(),
+            blog_id => $blog_id,
+            message => "PubOffline could not write to the Output File "
+                . "Path ($path) as specified in the plugin Settings. "
+                . $fmgr->errstr,
+        });
+        
+        return 0;
+    }
+}
+
 1;
 
 __END__
