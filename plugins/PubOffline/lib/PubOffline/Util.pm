@@ -22,6 +22,8 @@ sub get_output_path {
         'output_file_path',
         'blog:' . $blog_id
     );
+    
+    return '' if !$path;
 
     # Add a trailing slash, if needed.
     $path = $path . '/' if $path !~ /\/$/;
@@ -47,6 +49,8 @@ sub get_output_url {
         'output_file_url',
         'blog:' . $blog_id
     );
+    
+    return '' if !$url;
 
     # Add a trailing slash, if needed.
     $url = $url . '/' if $url !~ /\/$/;
@@ -72,6 +76,8 @@ sub get_archive_path {
         'offline_archives_path',
         'blog:' . $blog_id
     );
+
+    return '' if !$path;
 
     # Add a trailing slash, if needed.
     $path = $path . '/' if $path !~ /\/$/;
