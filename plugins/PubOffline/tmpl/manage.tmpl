@@ -16,6 +16,7 @@
             id="create_archive"
             class="success">
             An offline archive has been entered into the queue to be created.
+            After it's created, it will be available here.
         </mtapp:statusmsg>
     </mt:If>
     <mt:If name="deleted_archive">
@@ -33,6 +34,16 @@
             <mt:Var name="failed_delete">
         </mtapp:statusmsg>
     </mt:If>
+    <mt:Unless name="output_file_path">
+        <mtapp:statusmsg
+            id="missing_output_file_path"
+            class="error">
+            Publish Offline is not configured for this blog. Visit 
+            <a href="<mt:Var name="script_uri">?__mode=cfg_plugins&amp;blog_id=<mt:Var name="blog_id">">Tools 
+            > Plugins</a>, find Publish Offline and review the Settings. At a 
+            minimum, the Offline Output File Path field is required.
+        </mtapp:statusmsg>
+    </mt:Unless>
 </mt:SetVarBlock>
 
 <mt:SetVarBlock name="html_body_footer">
@@ -41,42 +52,44 @@
 
 <mt:Include name="include/header.tmpl" screen_class="listing-screen">
 
-<div style="margin: 10px 10px 20px;">
-    <p>
-        Publish Offline is creating the offline version of this blog at
-        <code><mt:Var name="output_file_path"></code>.<br />
-        <mt:If name="output_file_url">The offline version is publicly visible at
-        <a href="<mt:Var name="output_file_url">" 
-            target="_blank"><mt:Var name="output_file_url"></a>.</mt:If>
-    </p>
+<mt:If name="output_file_path">
+    <div style="margin: 10px 10px 20px;">
+        <p>
+            Publish Offline is saving the offline version of this blog at
+            <code><mt:Var name="output_file_path"></code>.<br />
+            <mt:If name="output_file_url">The offline version is publicly visible at
+            <a href="<mt:Var name="output_file_url">" 
+                target="_blank"><mt:Var name="output_file_url"></a>.</mt:If>
+        </p>
 
-    <div class="actions-bar">
-        <div class="actions-bar-inner pkg actions">
-            <button
-                onclick="return openDialog(false, 'po_create_archive', 'blog_id=<mt:Var name="blog_id">')"
-                class="primary-button"
-                style="padding-bottom: 4px;"
-                title="Create an Archive of the Offline Version"
-                >Create an Offline Archive</button>
+        <div class="actions-bar">
+            <div class="actions-bar-inner pkg actions">
+                <button
+                    onclick="return openDialog(false, 'po_create_archive', 'blog_id=<mt:Var name="blog_id">')"
+                    class="primary-button"
+                    style="padding-bottom: 4px;"
+                    title="Create an Archive of the Offline Version"
+                    >Create an Offline Archive</button>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="listing" style="background: #f3f6f9; border-top: 1px solid #cddee7">
-    <div id="actions-bar-top" class="actions-bar actions-bar-top" 
-        style="display: block; border: none; padding: 0;">
-        <div class="actions-bar-inner pkg">
-            <span class="button-actions actions">
-                <a href="javascript:void(0)"
-                     onclick="doForMarkedInThisWindow(
-                         getByID('listing-form'),
-                         'archive', 'archives', 'id', 'po_delete_archive'); 
-                         return false;"
-                     title="Delete Archive">Delete</a>
-            </span>
+    <div class="listing" style="background: #f3f6f9; border-top: 1px solid #cddee7">
+        <div id="actions-bar-top" class="actions-bar actions-bar-top" 
+            style="display: block; border: none; padding: 0;">
+            <div class="actions-bar-inner pkg">
+                <span class="button-actions actions">
+                    <a href="javascript:void(0)"
+                         onclick="doForMarkedInThisWindow(
+                             getByID('listing-form'),
+                             'archive', 'archives', 'id', 'po_delete_archive'); 
+                             return false;"
+                         title="Delete Archive">Delete</a>
+                </span>
+            </div>
         </div>
     </div>
-</div>
+</mt:If>
 
 <mtapp:Listing loop="offline_archives" 
     default="No Offline Archives could be found." 

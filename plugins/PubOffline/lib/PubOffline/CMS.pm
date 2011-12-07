@@ -127,6 +127,7 @@ sub manage {
     my @offline_archives;
     my $archive_path = get_archive_path({ blog_id => $blog->id });
 
+    # Only try loading archives if an archive path was specified.
     if ($archive_path) {
         opendir (DIR, $archive_path);
         while ( my $file_name = readdir(DIR) ) {
@@ -136,7 +137,8 @@ sub manage {
 
             my $file_path = File::Spec->catfile($archive_path, $file_name);
 
-            # Get the size of the zip file.
+            # Get the size of the zip file and turn it into something human-
+            # readable.
             my $size = (stat $file_path)[7];
             # ...and make it human readable
             my @units = ('bytes','kB','MB','GB'); # Valid units
@@ -151,7 +153,8 @@ sub manage {
 
             # Get the date/timestamp of the file.
             my $epoch = (stat $file_path)[9]; # The file's modified-on date
-            my @months = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec");
+            my @months = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug",
+                "Sep","Oct","Nov","Dec");
             my ($sec, $min, $hour, $day, $month, $year) 
                 = (localtime($epoch))[0,1,2,3,4,5];
             my $period = 'AM'; # If $hour < 12, this is already correct.
@@ -160,8 +163,8 @@ sub manage {
                 $hour -= 12;
             }
             # Assemble a human-readable date.
-            my $date = $months[$month] . ' ' . $day . ', ' . ($year+1900) . ' '
-                . $hour . ":" . sprintf("%02d", $min) . ' ' . $period;
+            my $date = $months[$month] . ' ' . $day . ', ' . ($year+1900) 
+                . ' ' . $hour . ":" . sprintf("%02d", $min) . ' ' . $period;
 
             push @offline_archives, {
                 file_path => $file_path,

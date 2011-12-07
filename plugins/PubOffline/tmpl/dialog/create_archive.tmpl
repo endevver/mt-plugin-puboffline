@@ -6,9 +6,11 @@
     <input type="hidden" name="create_archive" value="1" />
     <input type="hidden" name="blog_id" value="<mt:Var name="blog_id">" />
 
+<mt:If name="offline_archives_path">
     <p>
         A zip archive will be created containing the contents of the offline
-        folder for this blog, creating an archive. Offline archives will be written to <code><mt:Var name="offline_archives_path"></code>.
+        folder for this blog, creating a snapshot archive. Offline archives
+        will be written to <code><mt:Var name="offline_archives_path"></code>.
     </p>
 
     <mtapp:setting
@@ -23,9 +25,16 @@
                 class="ti full-width"
                 style="width: 604px;" />
     </mtapp:setting>
+<mt:Else>
+    <p>
+        An Offline Archives File Path has not been specified in Publish
+        Offline's plugin Settings. This must be specified before continuing.
+    </p>
+</mt:If>
 
     <div class="actions-bar">
         <div class="actions-bar-inner pkg actions">
+        <mt:If name="offline_archives_path">
             <button
                 id="continue"
                 type="submit"
@@ -33,6 +42,7 @@
                 class="primary-button"
                 title="Create Archive"
                 >Create Archive</button>
+        </mt:If>
             <button
                 onclick="closeDialog(); return false"
                 type="submit"
