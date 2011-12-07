@@ -218,8 +218,20 @@ sub create_archive {
             $job = MT->model('ts_job')->new();
             $job->funcid( $func_id );
             $job->uniqkey( $blog_id );
-            $job->arg( $q->param('email') );
         }
+
+        # If this job was previously sen to the queue then it already has an
+        # email address specified. We want to keep that, and add this new one.
+        my @existing = split(/\s*,\s*/, $job->arg); # Existing addresses
+        my %emails = map { $_ => 1 } @existing; # Push array into a hash
+        # Newly-entered emails should be parsed and added to the hash, too.
+        foreach my $email ( split(/\s*,\s*/, $q->param('email')) ) {
+            $emails{ $email }++;
+        }
+        # Now that we've got a hash of all email addresses, we can create a
+        # simple string of all of them to be saved.
+        my $email_string = join(',', keys %emails);
+        $job->arg( $email_string );
 
         $job->priority( $priority );
         $job->grabbed_until(1);

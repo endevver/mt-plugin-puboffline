@@ -61,8 +61,11 @@ sub work {
 
         # Send an email notification about the zip file creation. (But only
         # send an email if one was specified when creating the Schwartz job.)
-        my $email = $mt_job->arg;
-        if ($email) {
+        my $email_string = $mt_job->arg;
+        # There may be many addresses in the string; split them and handle
+        # individually.
+        my @emails = split( /\s*,\s*/, $email_string);
+        foreach my $email (@emails) {
             _send_notification({
                 blog_id  => $blog_id,
                 zip_file => $zip_file,
@@ -171,6 +174,13 @@ sub _send_notification {
             blog_id => $blog_id,
             level   => MT->model('log')->ERROR(),
         });
+    
+    MT->log({
+        message => "Publish Offline sent a notification email to $email "
+            . "about the creation of the archive $zip_file.",
+        blog_id => $blog_id,
+        level   => MT->model('log')->ERROR(),
+    });
 }
 
 sub grab_for { 60 }
