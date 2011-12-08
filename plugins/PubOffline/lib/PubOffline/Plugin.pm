@@ -20,6 +20,10 @@ sub build_file_filter {
     );
     return 1 if !$enabled;
 
+    # Check if the output file path has been configured; give up if it hasn't.
+    my $output_file_path = get_output_path({ blog_id => $fi->blog_id });
+    return 1 if !$output_file_path;
+
     # This first block of code checks to see if the file being republished is
     # coming from the PubOffline::Worker::PublishOffline worker. If it is,
     # then we know that we need to set the IsOfflineMode tag context to true
@@ -44,7 +48,7 @@ sub build_file_filter {
     # Prevent building of disabled templates if they get this far
     return if $throttle->{type} == MT::PublishOption::DISABLED();
 
-    _create_publish_job({ fileinfo  => $fi, });
+    _create_publish_job({ fileinfo => $fi, });
 }
 
 # This is invoked just before the file is written. We use this to re-write
@@ -62,6 +66,13 @@ sub build_page {
     );
     return if !$enabled;
 
+    # Use the output file path to determine how many directories deep a URL
+    # needs to point to create the relative link.
+    my $output_file_path = get_output_path({ blog_id => $fi->blog_id });
+
+    # Check if the output file path has been configured; give up if it hasn't.
+    return 1 if !$output_file_path;
+
     # Give up if this callback was *not* invoked for an offline publish job.
     # Basically, if not coming from PubOffline::Worker::PublishOffline, quit.
     return if !$fi->{'is_offline_file'};
@@ -74,10 +85,6 @@ sub build_page {
 
     my $blog_site_path = $blog->site_path;
     $blog_site_path = $blog_site_path . '/' if $blog_site_path !~ /\/$/;
-
-    # Use the output file path to determine how many directories deep a URL
-    # needs to point to create the relative link.
-    my $output_file_path = get_output_path({ blog_id => $blog->id });
 
     # First determine if the current file is at the root of the blog by making
     # the file path relative. To do that, try stripping off the output file
