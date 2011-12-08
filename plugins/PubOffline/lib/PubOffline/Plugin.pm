@@ -44,49 +44,7 @@ sub build_file_filter {
     # Prevent building of disabled templates if they get this far
     return if $throttle->{type} == MT::PublishOption::DISABLED();
 
-    _create_publish_job( $fi );
-}
-
-sub _create_publish_job {
-    my ($fi) = @_;
-
-    # Ok, let's build the Schwartz Job.
-    require MT::TheSchwartz;
-    my $ts = MT::TheSchwartz->instance();
-    my $priority = _get_job_priority($fi);
-    my $func_id = $ts->funcname_to_id(
-        $ts->driver_for,
-        $ts->shuffled_databases,
-        'PubOffline::Worker::PublishOffline'
-    );
-
-    # Look for a job that has these parameters.
-    my $job = MT->model('ts_job')->load({
-        funcid  => $func_id,
-        uniqkey => $fi->id,
-    });
-
-    unless ($job) {
-        $job = MT->model('ts_job')->new();
-        $job->funcid( $func_id );
-        $job->uniqkey( $fi->id );
-    }
-
-    $job->priority( $priority );
-    $job->grabbed_until(1);
-    $job->run_after(1);
-    $job->coalesce( 
-        ( $fi->blog_id || 0 ) 
-        . ':' . $$ 
-        . ':' . $priority 
-        . ':' . ( time - ( time % 10 ) ) 
-    );
-
-    $job->save or MT->log({
-        blog_id => $fi->blog_id,
-        level   => MT::Log::ERROR(),
-        message => "Could not queue offline publish job: " . $job->errstr
-    });
+    _create_publish_job({ fileinfo  => $fi, });
 }
 
 # This is invoked just before the file is written. We use this to re-write
@@ -278,6 +236,57 @@ sub build_page {
     }
 }
 
+# Send a template to the publish queue; create a Schwartz job to handle it.
+sub _create_publish_job {
+    my ($arg_ref) = @_;
+    my $fi        = $arg_ref->{fileinfo};
+    my $jumpstart = $arg_ref->{jumpstart};
+
+    # Ok, let's build the Schwartz Job.
+    require MT::TheSchwartz;
+    my $ts = MT::TheSchwartz->instance();
+    my $priority = _get_job_priority($fi);
+    my $func_id = $ts->funcname_to_id(
+        $ts->driver_for,
+        $ts->shuffled_databases,
+        'PubOffline::Worker::PublishOffline'
+    );
+
+    # Look for a job that has these parameters.
+    my $job = MT->model('ts_job')->load({
+        funcid  => $func_id,
+        uniqkey => $fi->id,
+    });
+
+    unless ($job) {
+        $job = MT->model('ts_job')->new();
+        $job->funcid( $func_id );
+        $job->uniqkey( $fi->id );
+    }
+
+    $job->priority( $priority );
+    $job->grabbed_until(1);
+    $job->run_after(1);
+    $job->coalesce( 
+        ( $fi->blog_id || 0 ) 
+        . ':' . $$ 
+        . ':' . $priority 
+        . ':' . ( time - ( time % 10 ) ) 
+    );
+
+    # If this job is created as part of the Jumpstart process, note it so that
+    # we can keep the user informed about Jumpstart progress.
+    $job->arg('jumpstart') if $jumpstart;
+
+    $job->save or MT->log({
+        blog_id => $fi->blog_id,
+        level   => MT::Log::ERROR(),
+        message => "Could not queue offline publish job: " . $job->errstr
+    });
+}
+
+# Get the priority of a publish job. This is called by _create_publish_job and
+# uses the type of archive to determine a priority for the job.
 sub _get_job_priority {
     my ($fi) = @_;
     my $priority = 0;
@@ -327,7 +336,7 @@ sub cms_post_save_asset {
     );
     return if !$enabled;
 
-    _create_asset_handling_job( $asset );
+    _create_asset_handling_job({ asset => $asset, });
 }
 
 # When uploading a file, we want to be sure it gets copied offline.
@@ -342,12 +351,14 @@ sub cms_upload_file {
     );
     return if !$enabled;
 
-    _create_asset_handling_job( $params{asset} );
+    _create_asset_handling_job({ asset => $params{asset}, });
 }
 
 # Create a The Schwartz job for an asset.
 sub _create_asset_handling_job {
-    my ($asset) = @_;
+    my ($arg_ref) = @_;
+    my $asset     = $arg_ref->{asset};
+    my $jumpstart = $arg_ref->{jumpstart};
 
     # Ok, let's build the Schwartz Job.
     require MT::TheSchwartz;
@@ -383,6 +394,10 @@ sub _create_asset_handling_job {
         . ':' . ( time - ( time % 10 ) ) 
     );
 
+    # If this job is created as part of the Jumpstart process, note it so that
+    # we can keep the user informed about Jumpstart progress.
+    $job->arg('jumpstart') if $jumpstart;
+
     $job->save or MT->log({
         blog_id => $asset->blog_id,
         level   => MT::Log::ERROR(),
@@ -394,7 +409,9 @@ sub _create_asset_handling_job {
 # Use the Static Manifest Field to decide what static content needs to be
 # handled.
 sub _create_static_handling_jobs {
-    my $blog_id = @_;
+    my ($arg_ref) = @_;
+    my $blog_id   = $arg_ref->{blog_id};
+    my $jumpstart = $arg_ref->{jumpstart};
     my $plugin = MT->component('PubOffline');
 
     # Just give up if static files are not required.
@@ -430,8 +447,9 @@ sub _create_static_handling_jobs {
 
             # Create a static handling job for this path.
             _create_static_handling_job({
-                path    => $path,
-                blog_id => $blog_id,
+                path      => $path,
+                blog_id   => $blog_id,
+                jumpstart => $jumpstart,
             });
         }
     }
@@ -442,8 +460,9 @@ sub _create_static_handling_jobs {
         my $static_file_path = MT->config('StaticFilePath');
 
         _create_static_handling_job({
-            path    => $static_file_path,
-            blog_id => $blog_id,
+            path      => $static_file_path,
+            blog_id   => $blog_id,
+            jumpstart => $jumpstart,
         });
     }
 }
@@ -454,8 +473,9 @@ sub _create_static_handling_jobs {
 # multiple static handling jobs may be created.
 sub _create_static_handling_job {
     my ($arg_ref) = @_;
-    my $path    = $arg_ref->{path};
-    my $blog_id = $arg_ref->{blog_id};
+    my $path      = $arg_ref->{path};
+    my $blog_id   = $arg_ref->{blog_id};
+    my $jumpstart = $arg_ref->{jumpstart};
 
     # Ok, let's build the Schwartz Job.
     require MT::TheSchwartz;

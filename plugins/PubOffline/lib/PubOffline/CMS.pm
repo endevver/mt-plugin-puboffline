@@ -49,11 +49,17 @@ sub jumpstart {
             # file-based asset) or if the asset file doesn't exist.
             next if !$asset->file_path || !-e $asset->file_path;
 
-            PubOffline::Plugin::_create_asset_handling_job( $asset );
+            PubOffline::Plugin::_create_asset_handling_job({
+                asset     => $asset,
+                jumpstart => 1,
+            });
         }
 
         # Jumpstart static files
-        PubOffline::Plugin::_create_static_handling_jobs( $blog_id );
+        PubOffline::Plugin::_create_static_handling_jobs({
+            blog_id   => $blog_id,
+            jumpstart => 1,
+        });
 
         # Jumpstart templates: indexes and archives.
         my $iter = MT->model('fileinfo')->load_iter({
@@ -62,7 +68,10 @@ sub jumpstart {
 
         while ( my $fi = $iter->() ) {
             # Create a Schwartz job for each file that needs to be published.
-            PubOffline::Plugin::_create_publish_job( $fi );
+            PubOffline::Plugin::_create_publish_job({
+                fileinfo  => $fi,
+                jumpstart => 1,
+            });
         }
 
         return $plugin->load_tmpl( 'dialog/close.tmpl' );
