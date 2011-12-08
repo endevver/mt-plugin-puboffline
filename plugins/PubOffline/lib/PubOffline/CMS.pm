@@ -174,9 +174,8 @@ sub manage {
     if ($archive_path) {
         opendir (DIR, $archive_path);
         while ( my $file_name = readdir(DIR) ) {
-            # Ignore anything that starts with a ".," such as ".," "..," and
-            # ".DS_Store."
-            next if $file_name =~ /^\./;
+            # Ignore anything except .zip files.
+            next if $file_name !~ /\.zip$/;
 
             my $file_path = File::Spec->catfile($archive_path, $file_name);
 
