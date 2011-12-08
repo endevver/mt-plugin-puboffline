@@ -11,12 +11,38 @@
 </mt:SetVarBlock>
 
 <mt:SetVarBlock name="system_msg">
+    <mt:If name="jumpstart_in_process">
+        <mtapp:statusmsg
+            id="jumpstart_in_process"
+            class="error">
+            A Jumpstart for the offline version is in process. The offline
+            version will be incomplete until the Jumpstart finishes.
+        </mtapp:statusmsg>
+    </mt:If>
     <mt:If name="create_archive">
         <mtapp:statusmsg
             id="create_archive"
             class="success">
             An offline archive has been entered into the queue to be created.
             After it's created, it will be available here.
+        </mtapp:statusmsg>
+    <mt:Else>
+        <mt:If name="po_archive_jobs">
+            <mtapp:statusmsg
+                id="po_archive_jobs"
+                class="info">
+                An offline archive job is in the queue. After it's created, it
+                will be available here.
+            </mtapp:statusmsg>
+        </mt:If>
+    </mt:If>
+    <mt:If name="po_jobs">
+        <mtapp:statusmsg
+            id="po_jobs"
+            class="info">
+            There are currently <mt:Var name="po_jobs"> job(s) in the queue
+            for Publish Offline. The offline version won't be up to date until
+            these are completed.
         </mtapp:statusmsg>
     </mt:If>
     <mt:If name="deleted_archive">

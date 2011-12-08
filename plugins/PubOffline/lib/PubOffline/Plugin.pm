@@ -511,6 +511,10 @@ sub _create_static_handling_job {
         . ( time - ( time % 10 ) ) 
     );
 
+    # If this job is created as part of the Jumpstart process, note it so that
+    # we can keep the user informed about Jumpstart progress.
+    $job->arg('jumpstart') if $jumpstart;
+
     $job->save or MT->log({
         blog_id => $blog_id,
         level   => MT::Log::ERROR(),

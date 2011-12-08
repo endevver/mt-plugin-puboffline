@@ -114,27 +114,61 @@ sub manage {
     my $app     = shift;
     my ($param) = @_;
     my $q       = $app->param;
-    my $blog    = $app->blog;
+    my $blog_id = $app->blog->id;
     my $plugin  = MT->component('PubOffline');
 
     return $plugin->translate("Permission denied.")
         unless $app->user->is_superuser()
-            || $app->user->permissions($blog->id)->can_administer_blog();
+            || $app->user->permissions($blog_id)->can_administer_blog();
 
-    my $config = $plugin->get_config_hash( 'blog:' . $blog->id );
+    my $config = $plugin->get_config_hash( 'blog:' . $blog_id );
 
     # Show any set system mesages.
     $param->{create_archive}  = $q->param('create_archive');
     $param->{deleted_archive} = $q->param('deleted_archive');
     $param->{failed_delete}   = $q->param('failed_delete');
-    
-    $param->{output_file_path} = get_output_path({ blog_id => $blog->id });
-    $param->{output_file_url}  = get_output_url({ blog_id => $blog->id });
+
+    # Are there any Schwartz jobs for the offline site in queue? If so, we
+    # should notify the user so that they can understand what's happening
+    # at the moment.
+    my @funcmap = MT->model('ts_funcmap')->load({
+        funcname => [
+            'PubOffline::Worker::HandleAsset',
+            'PubOffline::Worker::HandleStatic',
+            'PubOffline::Worker::PublishOffline',
+        ],
+    });
+    my @funcmap_ids = map { $_->funcid } @funcmap;
+    # Grab a count of how many Publish Offline related jobs there are. (Don't
+    # count any offline archive jobs, because we report those separately.)
+    $param->{po_jobs} = MT->model('ts_job')->count({
+        funcid   => \@funcmap_ids,
+        coalesce => { like => $blog_id.':%' }, # In the current blog only
+    });
+
+    # Are there any offline archives in the process of being built?
+    my $funcmap = MT->model('ts_funcmap')->load({
+        funcname => 'PubOffline::Worker::OfflineArchive',
+    });
+    $param->{po_archive_jobs} = MT->model('ts_job')->count({
+        funcid   => $funcmap->funcid,
+        coalesce => { like => $blog_id.':%' }, # In the current blog only
+    });
+
+    # Are any of the jobs in the queue Jumpstarts? We want to warn the user
+    # that until the Jumpstart finishes the offline version is incomplete.
+    $param->{jumpstart_in_process} = MT->model('ts_job')->exist({
+        arg      => 'jumpstart',
+        coalesce => { like => $blog_id.':%' }, # In the current blog only
+    });
+
+    $param->{output_file_path} = get_output_path({ blog_id => $blog_id });
+    $param->{output_file_url}  = get_output_url({ blog_id => $blog_id });
 
     # Read the offline folder to see what archives are available, and use that
     # information to populate the listing screen.
     my @offline_archives;
-    my $archive_path = get_archive_path({ blog_id => $blog->id });
+    my $archive_path = get_archive_path({ blog_id => $blog_id });
 
     # Only try loading archives if an archive path was specified.
     if ($archive_path) {
