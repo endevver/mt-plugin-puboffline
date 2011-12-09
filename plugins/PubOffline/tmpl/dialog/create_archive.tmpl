@@ -1,0 +1,57 @@
+<mt:Var name="page_title" value="Publish Offline: Create an Archive">
+<mt:include name="dialog/header.tmpl">
+
+<form method="post" action="<mt:Var name="script_url">">
+    <input type="hidden" name="__mode" value="po_create_archive" />
+    <input type="hidden" name="create_archive" value="1" />
+    <input type="hidden" name="blog_id" value="<mt:Var name="blog_id">" />
+
+<mt:If name="offline_archives_path">
+    <p>
+        A zip archive will be created containing the contents of the offline
+        folder for this blog, creating a snapshot archive. Offline archives
+        will be written to <code><mt:Var name="offline_archives_path"></code>.
+    </p>
+
+    <mtapp:setting
+        id="email"
+        label_class="top-label"
+        label="<__trans phrase="Notify when Complete">"
+        hint="Send an email notification to this email address when the archive process is complete. Separate multiple addresses with a comma."
+        show_hint="1">
+            <input type="text" 
+                name="email" 
+                value="<mt:Var name="default_email">"
+                class="ti full-width"
+                style="width: 604px;" />
+    </mtapp:setting>
+<mt:Else>
+    <p>
+        An Offline Archives File Path has not been specified in Publish
+        Offline's plugin Settings. This must be specified before continuing.
+    </p>
+</mt:If>
+
+    <div class="actions-bar">
+        <div class="actions-bar-inner pkg actions">
+        <mt:If name="offline_archives_path">
+            <button
+                id="continue"
+                type="submit"
+                accesskey="s"
+                class="primary-button"
+                title="Create Archive"
+                >Create Archive</button>
+        </mt:If>
+            <button
+                onclick="closeDialog(); return false"
+                type="submit"
+                accesskey="x"
+                class="cancel close"
+                title="Close (x)"
+                >Close</button>
+        </div>
+    </div>
+</form>
+
+<mt:Include name="dialog/footer.tmpl">

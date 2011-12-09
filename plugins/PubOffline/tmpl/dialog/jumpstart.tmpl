@@ -1,0 +1,46 @@
+<mt:Var name="page_title" value="Publish Offline: Jumpstart this Blog">
+<mt:include name="dialog/header.tmpl">
+
+<form method="post" action="<mt:Var name="script_url">">
+    <input type="hidden" name="__mode" value="po_jumpstart" />
+    <input type="hidden" name="jumpstart" value="1" />
+    <input type="hidden" name="blog_id" value="<mt:Var name="blog_id">" />
+
+<mt:If name="enabled">
+    <p>
+        Begin the Jumpstart to place all assets, static content, and templated
+        content into Schwartz jobs to be run by run-periodic-tasks.
+    </p>
+<mt:Else>
+    <p>
+        It appears that Publish Offline is not enabled on this blog. Publish
+        Offline must be enabled before the Jumpstart can begin. (If you have
+        checked the Enable Publish Offline checkbox then immediately clicked
+        the Jumpstart button, you should save the enabled state before
+        clicking the Jumpstart button.)
+    </p>
+</mt:If>
+
+    <div class="actions-bar">
+        <div class="actions-bar-inner pkg actions">
+<mt:If name="enabled">
+            <button
+                id="continue"
+                type="submit"
+                accesskey="s"
+                class="primary-button"
+                title="Jumpstart"
+                >Jumpstart</button>
+</mt:If>
+            <button
+                onclick="closeDialog(); return false"
+                type="submit"
+                accesskey="x"
+                class="cancel close"
+                title="Close (x)"
+                >Close</button>
+        </div>
+    </div>
+</form>
+
+<mt:Include name="dialog/footer.tmpl">

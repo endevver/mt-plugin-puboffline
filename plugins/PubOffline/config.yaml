@@ -3,67 +3,67 @@ name: 'Publish Offline'
 description: "This plugin allows administrators to publish a version of their site to another directory on their file system for the express purpose of creating a version of their site offline. It also provides for designers a set of template tags to conditionally display content depending upon whether or not the user is publishing the off or online version of their site."
 author_name: Endevver
 author_link: http://endevver.com
-version: 0.8
-schema_version: 3
-
-object_types:
-  offline_batch: 'PubOffline::OfflineBatch'
-  ts_job:
-    offline_batch_id: integer
+version: 1.0.0
 
 callbacks:
-  build_file_filter: $PubOffline::PubOffline::Plugin::build_file_filter
-  build_page: $PubOffline::PubOffline::Plugin::build_page
-
-tasks: $PubOffline::PubOffline::Plugin::load_tasks
+    build_file_filter:   PubOffline::Plugin::build_file_filter
+    build_page:          PubOffline::Plugin::build_page
+    cms_post_save.asset: PubOffline::Plugin::cms_post_save_asset
+    cms_upload_file:     PubOffline::Plugin::cms_upload_file
 
 task_workers:
-  publish_offline:
-    label: "Publishes an offline version of content"
-    class: 'MT::Worker::PublishOffline'
-  copy_static_offline:
-    label: "Copies static files into an offline folder"
-    class: 'MT::Worker::CopyStaticOffline'
+    publish_offline:
+        label: 'Publishes an offline version of content'
+        class: 'PubOffline::Worker::PublishOffline'
+    handle_asset:
+        label: 'Handle an asset for the offline version of a blog'
+        class: 'PubOffline::Worker::HandleAsset'
+    handle_static_files:
+         label: 'Handle static files for the offline version of a blog'
+         class: 'PubOffline::Worker::HandleStatic'
+    offline_archive:
+        label: 'Creates a zip archive of the offline version of a blog'
+        class: 'PubOffline::Worker::OfflineArchive'
 
-options:
-  output_file_path:
-    scope: blog
-    type: text
-    label: Output File Path
-    description: 'This is the path that "Publish Offline" will output its files to.'
-    default: '<mt:BlogSitePath>puboffline/'
-  output_url:
-    scope: blog
-    type: text
-    label: Base URL
-    description: 'This is the base URL for accessing files published by "Publish Offline."'
-    default: '<mt:BlogURL>puboffline/'
-
-# Obsolete
 settings:
-  zip:
-    scope: blog
-    default: 0
-  date:
-    scope: blog
-    default: 0
+    enable_puboffline:
+        scope: blog
+        default: 0
+    output_file_path:
+        scope: blog
+        default: '<mt:BlogSitePath>puboffline/'
+    output_file_url:
+        scope: blog
+        default: '<mt:BlogURL>puboffline/'
+    offline_archives_path:
+        scope: blog
+        default: '<mt:BlogSitePath>puboffline-archives/'
+    root_relative_url:
+        scope: blog
+        default: 0
+    asset_handling:
+        scope: blog
+        default: copy
+    static_handling:
+        scope: blog
+        default: none
+    static_manifest:
+        scope: blog
+        default: ''
+
+blog_config_template:
+    code: PubOffline::CMS::settings
 
 tags:
-  block:
-    IsOfflineMode?: $PubOffline::PubOffline::Plugin::tag_is_offline
+    block:
+        IsOfflineMode?: PubOffline::Tags::is_offline
 
 applications:
-  cms:
-    methods:
-      pub_offline: $PubOffline::PubOffline::Plugin::send_to_queue
-
-page_actions:
-  list_templates:
-    pub_offline:
-      label: 'Publish Offline Version'
-      order: 1012
-      dialog: pub_offline
-      permission: publish_post
-      condition: >
-        sub { MT->app->blog; }
-
+    cms:
+        menus: $PubOffline::PubOffline::CMS::menus
+        methods:
+            po_jumpstart:      PubOffline::CMS::jumpstart
+            po_manage:         PubOffline::CMS::manage
+            po_create_archive: PubOffline::CMS::create_archive
+            po_dl_archive:     PubOffline::CMS::download_archive
+            po_delete_archive: PubOffline::CMS::delete_archive

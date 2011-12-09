@@ -1,10 +1,4 @@
-# Movable Type (r) (C) 2001-2010 Six Apart, Ltd. All Rights Reserved.
-# This code cannot be redistributed without permission from www.sixapart.com.
-# For more information, consult your Movable Type license.
-#
-# $Id: Publish.pm 3455 2009-02-23 02:29:31Z auno $
-
-package MT::Worker::PublishOffline;
+package PubOffline::Worker::PublishOffline;
 
 use strict;
 use base qw( TheSchwartz::Worker );
@@ -14,7 +8,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use MT::FileInfo;
 use MT::PublishOption;
 use MT::Util qw( log_time );
-use File::Copy::Recursive qw(fcopy);
+use PubOffline::Util qw( get_output_path path_exists );
 
 sub keep_exit_status_for { 1 }
 
@@ -56,41 +50,39 @@ sub work {
 
         # FileInfo record missing? Strange, but ignore and continue.
         unless ($fi) {
+            # Should this even be logged?
+            MT->log({
+                level   => MT->model('log')->INFO(),
+                message => 'PubOffline: fileinfo record missing. Job ID: ' 
+                    . $job->{column_values}->{jobid},
+            });
             $job->completed();
             next;
         }
 
-        # The real blog site path was saved previously; grab it!
-#        use MT::Session;
-#        my $session = MT::Session::get_unexpired_value(86400, 
-#                        { id   => 'Puboffline blog '.$fi->blog_id, 
-#                          kind => 'po' });
-#        my $blog_site_path = $session->data;
+        my $output_file_path = get_output_path({ blog_id => $fi->blog_id });
+
+        my $result = path_exists({
+            blog_id => $fi->blog_id,
+            path    => $output_file_path,
+        });
+        next if !$result; # Give up if the path wasn't created.
 
         my $blog = MT->model('blog')->load( $fi->blog_id );
         my $blog_site_path = $blog->site_path;
 
-        my $plugin           = MT->component('PubOffline');
-        my $config           = $plugin->get_config_hash( 'blog:' . $fi->blog_id );
-        my $output_file_path = $config->{'output_file_path'};
-#        my $base_url         = $config->{'base_url'};
-#        my $batch;
-#        if ($mt_job->has_column('offline_batch_id')) {
-#            $batch = MT->model('offline_batch')->load( $mt_job->offline_batch_id );
-            my $fp = $fi->file_path;
-            $fp =~ s/^$blog_site_path(\/)*//;
-            my $np = File::Spec->catfile($output_file_path, $fp);
-            # TODO - change $fi record to point to different base directory
-            $fi->file_path($np);
-#        } else {
-#            MT->log( "Apparently, the job does not have the offline_batch_id column" );
-#        }
+        my $fp = $fi->file_path;
+        $fp =~ s/^$blog_site_path(\/)*//;
+        my $np = File::Spec->catfile($output_file_path, $fp);
+        # TODO - change $fi record to point to different base directory
+        $fi->file_path($np);
 
         my $priority = $job->priority ? ", priority " . $job->priority : "";
 
         # Important: prevents requeuing!
         $fi->{'from_queue'} = 1;
-#        $fi->{'offline_batch'} = $batch;
+
+        # So that the build_file_filter callback doesn't happen again.
         $fi->{'is_offline_file'} = 1;
 
         my $mtime = (stat($fi->file_path))[9];
@@ -111,19 +103,8 @@ sub work {
             }
         }
 
-        # Copy assets before any content can be published to the offline
-        # folder. This way, assets will be in place and asset tags,
-        # (especially <mt:AssetProperty file_size="1">) can work on them.
-
-# TODO - this needs to be done more on demand, since the concept of a batch is now obsolete
-# TODO - uncomment or find a new home:
-#        $res = _copy_assets($blog_site_path, $batch);
-
-        if ($res) {
-            $job->permanent_failure($res);
-        }
-
-        $res = _rebuild_from_fileinfo($fi, $output_file_path);
+        # Rebuild the file.
+        my $res = _rebuild_from_fileinfo($fi, $output_file_path);
 
         if (defined $res) {
             $job->completed();
@@ -131,17 +112,18 @@ sub work {
         } else {
             my $error = $mt->publisher->errstr;
             my $errmsg = $mt->translate(
-                "PubOffline: Error rebuilding file [_1]" . $fi->file_path . ": " . $error
+                "PubOffline: Error rebuilding file [_1]" 
+                . $fi->file_path . ": " . $error
             );
             MT::TheSchwartz->debug($errmsg);
             $job->permanent_failure($errmsg);
             require MT::Log;
             $mt->log({
                 ($fi->blog_id ? ( blog_id => $fi->blog_id ) : () ),
-                message => $errmsg,
+                message  => $errmsg,
                 metadata => log_time() . ' ' . $errmsg . ":\n" . $error,
                 category => "publish",
-                level => MT::Log::ERROR(),
+                level    => MT::Log::ERROR(),
             });
         }
     }
@@ -155,7 +137,6 @@ sub work {
             )
         );
     }
-
 }
 
 sub grab_for { 60 }
@@ -163,12 +144,13 @@ sub max_retries { 0 }
 sub retry_delay { 60 }
 
 # This is lifted from MT::WeblogPublisher, with a few changes.
-# Notably, the blog site_path needs to be set to the batch path
-# so that the site will output all files to the correct location.
+# Notably, when publishing index files the blog site path needs to be reset to
+# the offline path; when publishing archives the archive root needs to be set
+# to the offline path instead of the site path, also.
 sub _rebuild_from_fileinfo {
     my $pub = MT::WeblogPublisher->new();
-#    my $offline_path = pop;
-    my ($fi) = @_;
+    my ($fi) = shift;
+    my $output_file_path = shift;
 
     require MT::Blog;
     require MT::Entry;
@@ -189,35 +171,39 @@ sub _rebuild_from_fileinfo {
         file_info    => $fi
       );
 
+
+    # Index templates get handled a little differently than archives.
     if ( $at eq 'index' ) {
         my $tmpl = MT->model('template')->load( $fi->template_id );
-        my $new_path = $fi->file_path;
-        # TODO - this is indiscriminate. it needs to differentiate between xml, js, css, etc
-        $new_path =~ s/[^\.]+$/html/;
-        $tmpl->outfile( $new_path );
+
+        # Pass the blog object to rebuild_indexes with an updated site_path,
+        # reflecting the desired puboffline location. Save the original site
+        # path so that we can reset it later.
+        my $blog = MT->model('blog')->load( $fi->blog_id );
+        my $saved_site_path = $blog->site_path;
+        $blog->site_path( $output_file_path );
+
         $pub->rebuild_indexes(
-            BlogID   => $fi->blog_id,
+            Blog     => $blog,
             Template => $tmpl,
             FileInfo => $fi,
             Force    => 1,
         ) or return;
+
+        # Reset to the original site path. If a non-
+        # PubOffline::Worker::PublishOffline worker runs after this (such as 
+        # MT::Worker::Publish) then we want it to have the "real" path to work
+        # with so that it can publish properly, too.
+        $blog->site_path( $saved_site_path );
+
         return 1;
     }
 
     return 1 if $at eq 'None';
 
+    my $blog = MT->model('blog')->load( $fi->blog_id );
+
     my ( $start, $end );
-    my $blog = MT->model('blog')->load( $fi->blog_id )
-        if $fi->blog_id;
-
-    my $plugin           = MT->component('PubOffline');
-    my $config           = $plugin->get_config_hash( 'blog:' . $fi->blog_id );
-    my $output_file_path = $config->{'output_file_path'};
-    my $base_url         = $config->{'base_url'};
-
-    # Set the site_path, but don't save it--we don't want to overwrite it.
-    $blog->site_path( $output_file_path );
-
     my $entry = MT->model('entry')->load( $fi->entry_id )
       or return $pub->error(
         MT->translate( "Parameter '[_1]' is required", 'Entry' ) )
@@ -257,72 +243,15 @@ sub _rebuild_from_fileinfo {
         $ctx->{current_timestamp_end} = $end;
     }
 
-    my $arch_root =
-      ( $at eq 'Page' ) ? $blog->site_path : $blog->archive_path;
-    return $pub->error(
-        MT->translate("You did not set your blog publishing path") )
-      unless $arch_root;
-
     my %cond;
-    $pub->rebuild_file( $blog, $arch_root, $map, $at, $ctx, \%cond, 1,
+
+    $pub->rebuild_file( $blog, $output_file_path, $map, $at, $ctx, \%cond, 1,
         FileInfo => $fi, )
       or return;
 
-    1;
-}
-
-sub _copy_assets {
-    my $blog_site_path = shift;
-    my ($batch) = @_;
-
-    # If the assets for this batch have already been copied just give up.
-    return if $batch->assets_copied;
-
-    my $iter = MT->model('asset')->load_iter({
-        blog_id => $batch->blog_id, 
-        class   => '*',
-    });
-    while ( my $asset = $iter->() ) {
-        # Give up if the asset doesn't exist on the file system. No point
-        # trying to copy something that doesn't exist!
-        next unless $asset->file_path && -e $asset->file_path;
-
-        # We need to rebuild the asset file path as the real, "online"
-        # path, so that the file can be found.
-        my $rel_file_path = $asset->file_path;
-        $rel_file_path =~ s/$blog_site_path//;
-
-        my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
-        my $dest   = File::Spec->catfile($batch->path, $rel_file_path);
-
-        # Finally, copy the asset.
-        my $copied_asset = fcopy($source,$dest);
-
-        if (!$copied_asset) {
-            my $errmsg = MT->translate(
-                "PubOffline: Error copying asset ID [_1] ([_2]) to target directory: [_3]", 
-                $asset->id,
-                $source, 
-                $dest
-            );
-            MT::TheSchwartz->debug($errmsg);
-            MT->log({
-                ($batch->blog_id ? ( blog_id => $batch->blog_id ) : () ),
-                message => $errmsg,
-                metadata => log_time() . ' ' . $errmsg,
-                category => "publish",
-                level => MT::Log::ERROR(),
-            });
-        }
-    }
-
-    # _copy_assets is actually set up to run for each job found in the ts_job 
-    # table. We want it to run once for each batch, but since the batch is 
-    # likely the same for each job, _copy_assets is probably running many, 
-    # many times. So, with _copy_assets complete, mark the batch so that we 
-    # don't need to try copying the same assets again.
-    $batch->assets_copied(1);
-    $batch->save or die $batch->errstr;
+    return 1;
 }
 
 1;
+
+__END__
