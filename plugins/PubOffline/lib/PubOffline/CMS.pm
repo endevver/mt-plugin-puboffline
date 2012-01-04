@@ -62,11 +62,11 @@ sub jumpstart {
         });
 
         # Jumpstart templates: indexes and archives.
-        my $iter = MT->model('fileinfo')->load_iter({
+        my $fi_iter = MT->model('fileinfo')->load_iter({
             blog_id => $blog_id,
         });
 
-        while ( my $fi = $iter->() ) {
+        while ( my $fi = $fi_iter->() ) {
             # Create a Schwartz job for each file that needs to be published.
             PubOffline::Plugin::_create_publish_job({
                 fileinfo  => $fi,
