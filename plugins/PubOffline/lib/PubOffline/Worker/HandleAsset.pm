@@ -8,6 +8,7 @@ use TheSchwartz::Job;
 use Time::HiRes qw(gettimeofday tv_interval);
 use PubOffline::Util qw( get_output_path path_exists );
 use File::Copy::Recursive qw(fcopy);
+use File::Basename;
 
 sub keep_exit_status_for { 1 }
 
@@ -170,6 +171,16 @@ sub _hard_link_asset {
     # it already points to the latest data. (It's also worth noting that 
     # creating a link when a link already exists just throws an error.)
     return 1 if -e $dest;
+
+    # Grab the path to the file (undef is the filename).
+    my (undef, $path) = fileparse($dest);
+
+    # Create the parent directory structure before trying to
+    # link the file.
+    my $fmgr = MT::FileMgr->new('Local')
+        or die MT::FileMgr->errstr;
+    $fmgr->mkpath( $path )
+        or die MT::FileMgr->errstr;
 
     # Create the hard link.
     my $result = link( $source, $dest );
