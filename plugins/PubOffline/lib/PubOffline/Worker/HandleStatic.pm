@@ -77,6 +77,9 @@ sub work {
             'static_handling',
             'blog:' . $blog_id,
         );
+        
+        # Give up if static content isn't supposed to be copied offline.
+        return if $pref eq 'none';
 
         if ($pref eq 'hard_link') {
             my $fmgr = MT::FileMgr->new('Local')
