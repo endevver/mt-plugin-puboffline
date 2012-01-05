@@ -66,9 +66,7 @@ sub work {
         my $rel_file_path = $source;
         $rel_file_path =~ s/$static_file_path//;
 
-        my $output_file_path = get_output_path({ 
-            blog_id => $blog_id,
-        });
+        my $output_file_path = get_output_path({ blog_id => $blog_id, });
 
         my $dest = File::Spec->catfile($output_file_path, 'static', $rel_file_path);
 

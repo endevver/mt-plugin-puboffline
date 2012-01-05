@@ -31,7 +31,9 @@ sub work {
     my $job_iter;
     if (my $key = $job->coalesce) {
         $job_iter = sub {
-            shift @jobs || MT::TheSchwartz->instance->find_job_with_coalescing_value($class, $key);
+            shift @jobs 
+                || MT::TheSchwartz->instance->find_job_with_coalescing_value(
+                    $class, $key);
         };
     }
     else {
@@ -82,9 +84,6 @@ sub work {
 
         # Important: prevents requeuing!
         $fi->{'from_queue'} = 1;
-
-        # So that the build_file_filter callback doesn't happen again.
-        $fi->{'is_offline_file'} = 1;
 
         my $mtime = (stat($fi->file_path))[9];
 
@@ -171,7 +170,6 @@ sub _rebuild_from_fileinfo {
         file_info    => $fi
       );
 
-
     # Index templates get handled a little differently than archives.
     if ( $at eq 'index' ) {
         my $tmpl = MT->model('template')->load( $fi->template_id );
@@ -179,7 +177,7 @@ sub _rebuild_from_fileinfo {
 
         # Use our _rebuild_indexes (rather than Weblog::Publisher's) so that
         # the output path can be modified as necessary.
-        _rebuild_indexes(
+        _rebuild_indexes( $pub,
             Blog     => $blog,
             Template => $tmpl,
             FileInfo => $fi,
@@ -235,7 +233,7 @@ sub _rebuild_from_fileinfo {
 
     my %cond;
 
-    $pub->rebuild_file( $blog, $output_file_path, $map, $at, $ctx, \%cond, 1,
+    _rebuild_file( $pub, $blog, $output_file_path, $map, $at, $ctx, \%cond, 1,
         FileInfo => $fi, )
       or return;
 
@@ -243,10 +241,10 @@ sub _rebuild_from_fileinfo {
 }
 
 # This is lifted from MT::WeblogPublisher, with a few changes.
-# The offline path needs to be fed when republishing index templates.
+# The offline path needs to be fed when republishing index templates, and a
+# `puboffline` key is included with callbacks.
 sub _rebuild_indexes {
-    #my $mt    = shift;
-    my $mt = MT->instance;
+    my $mt    = shift;
     my %param = @_;
     require MT::Template;
     require MT::Template::Context;
@@ -409,6 +407,7 @@ sub _rebuild_indexes {
                 File         => $file,
                 file         => $file,
                 force        => $force,
+                puboffline   => 1,
             )
           );
         $ctx->stash( 'blog', $blog );
@@ -442,7 +441,8 @@ sub _rebuild_indexes {
             Template     => $tmpl,
             template     => $tmpl,
             File         => $file,
-            file         => $file
+            file         => $file,
+            puboffline   => 1,
         );
 
         ## First check whether the content is actually changed. If not,
@@ -498,7 +498,8 @@ sub _rebuild_indexes {
             Template     => $tmpl,
             template     => $tmpl,
             File         => $file,
-            file         => $file
+            file         => $file,
+            puboffline   => 1,
         );
 
         $timer->mark("total:rebuild_indexes[template_id:" . $tmpl->id . ";file:$file]")
@@ -507,6 +508,397 @@ sub _rebuild_indexes {
     1;
 }
 
+# This is lifted from MT::WeblogPublisher, with a few changes.
+# A `puboffline` key is included with callbacks.
+sub _rebuild_file {
+    my $mt = shift;
+    my ( $blog, $root_path, $map, $at, $ctx, $cond, $build_static, %args )
+      = @_;
+    my $finfo;
+
+    my $archiver = $mt->archiver($at);
+    my ( $entry, $start, $end, $category, $author );
+
+    if ( $finfo = $args{FileInfo} ) {
+        $args{Author}   = $finfo->author_id   if $finfo->author_id;
+        $args{Category} = $finfo->category_id if $finfo->category_id;
+        $args{Entry}    = $finfo->entry_id    if $finfo->entry_id;
+        $map ||= MT::TemplateMap->load( $finfo->templatemap_id );
+        $at  ||= $finfo->archive_type;
+        if ( $finfo->startdate ) {
+            if ( ( $start, $end ) = $archiver->date_range($finfo->startdate) ) {
+                $args{StartDate} = $start;
+                $args{EndDate}   = $end;
+            }
+        }
+    }
+
+    # Calculate file path and URL for the new entry.
+    my $file = File::Spec->catfile( $root_path, $map->{__saved_output_file} );
+
+    ## Untaint. We have to assume that we can trust the user's setting of
+    ## the archive_path, and nothing else is based on user input.
+    ($file) = $file =~ /(.+)/s;
+
+    # compare file modification time to start of build process. if it
+    # is greater than the start_time, then we shouldn't need to build this
+    # file again
+    my $fmgr = $blog->file_mgr;
+    if (my $mod_time = $fmgr->file_mod_time($file)) {
+        return 1 if $mod_time >= $mt->start_time;
+    }
+
+    if ( $archiver->category_based ) {
+        $category = $args{Category};
+        die "Category archive type requires Category parameter"
+          unless $args{Category};
+        $category = MT::Category->load($category)
+          unless ref $category;
+        $ctx->var( 'category_archive', 1 );
+        $ctx->{__stash}{archive_category} = $category;
+    }
+    if ( $archiver->entry_based ) {
+        $entry = $args{Entry};
+        die "$at archive type requires Entry parameter"
+          unless $entry;
+        require MT::Entry;
+        $entry = MT::Entry->load($entry) if !ref $entry;
+        $ctx->var( 'entry_archive', 1 );
+        $ctx->{__stash}{entry} = $entry;
+    }
+    if ( $archiver->date_based ) {
+        # Date-based archive type
+        $start = $args{StartDate};
+        $end   = $args{EndDate};
+        Carp::confess("Date-based archive types require StartDate parameter")
+          unless $args{StartDate};
+        $ctx->var( 'datebased_archive', 1 );
+    }
+    if ( $archiver->author_based ) {
+
+        # author based archive type
+        $author = $args{Author};
+        die "Author-based archive type requires Author parameter"
+          unless $args{Author};
+        require MT::Author;
+        $author = MT::Author->load($author)
+          unless ref $author;
+        $ctx->var( 'author_archive', 1 );
+        $ctx->{__stash}{author} = $author;
+    }
+    local $ctx->{current_timestamp}     = $start if $start;
+    local $ctx->{current_timestamp_end} = $end   if $end;
+
+    $ctx->{__stash}{blog} = $blog;
+    $ctx->{__stash}{local_blog_id} = $blog->id;
+
+    require MT::FileInfo;
+
+# This kind of testing should be done at the time we save a post,
+# not during publishing!!!
+# if ($archiver->entry_based) {
+#     my $fcount = MT::FileInfo->count({
+#         blog_id => $blog->id,
+#         entry_id => $entry->id,
+#         file_path => $file},
+#         { not => { entry_id => 1 } });
+#     die MT->translate('The same archive file exists. You should change the basename or the archive path. ([_1])', $file) if $fcount > 0;
+# }
+
+    my $url = $blog->archive_url;
+    $url = $blog->site_url
+      if $archiver->entry_based && $archiver->entry_class eq 'page';
+    $url .= '/' unless $url =~ m|/$|;
+    $url .= $map->{__saved_output_file};
+
+    my $tmpl_id = $map->template_id;
+
+    # template specific for this entry (or page, as the case may be)
+    if ( $entry && $entry->template_id ) {
+
+        # allow entry to override *if* we're publishing an individual
+        # page, and this is the 'preferred' one...
+        if ( $archiver->entry_based ) {
+            if ( $map->is_preferred ) {
+                $tmpl_id = $entry->template_id;
+            }
+        }
+    }
+
+    my $tmpl = MT::Template->load($tmpl_id);
+    $tmpl->context($ctx);
+
+    # From Here
+    if ( my $tmpl_param = $archiver->template_params ) {
+        $tmpl->param($tmpl_param);
+    }
+
+    my ($rel_url) = ( $url =~ m|^(?:[^:]*\:\/\/)?[^/]*(.*)| );
+    $rel_url =~ s|//+|/|g;
+
+    # Clear out all the FileInfo records that might point at the page
+    # we're about to create
+    # FYI: if it's an individual entry, we don't use the date as a
+    #      criterion, since this could actually have changed since
+    #      the FileInfo was last built. When the date does change,
+    #      the old date-based archive doesn't necessarily get fixed,
+    #      but if another comes along it will get corrected
+    unless ($finfo) {
+        my %terms;
+        $terms{blog_id}     = $blog->id;
+        $terms{category_id} = $category->id if $archiver->category_based;
+        $terms{author_id}   = $author->id if $archiver->author_based;
+        $terms{entry_id}    = $entry->id if $archiver->entry_based;
+        $terms{startdate}   = $start
+          if $archiver->date_based && ( !$archiver->entry_based );
+        $terms{archive_type}   = $at;
+        $terms{templatemap_id} = $map->id;
+        my @finfos = MT::FileInfo->load( \%terms );
+
+        if (   ( scalar @finfos == 1 )
+            && ( $finfos[0]->file_path eq $file )
+            && ( ( $finfos[0]->url || '' ) eq $rel_url )
+            && ( $finfos[0]->template_id == $tmpl_id ) )
+        {
+
+            # if the shoe fits, wear it
+            $finfo = $finfos[0];
+        }
+        else {
+
+           # if the shoe don't fit, remove all shoes and create the perfect shoe
+            foreach (@finfos) { $_->remove(); }
+
+            $finfo = MT::FileInfo->set_info_for_url(
+                $rel_url, $file, $at,
+                {
+                    Blog        => $blog->id,
+                    TemplateMap => $map->id,
+                    Template    => $tmpl_id,
+                    ( $archiver->entry_based && $entry )
+                    ? ( Entry => $entry->id )
+                    : (),
+                    StartDate => $start,
+                    ( $archiver->category_based && $category )
+                    ? ( Category => $category->id )
+                    : (),
+                    ( $archiver->author_based )
+                    ? ( Author => $author->id )
+                    : (),
+                }
+              )
+              || die "Couldn't create FileInfo because "
+              . MT::FileInfo->errstr();
+        }
+    }
+
+    # If you rebuild when you've just switched to dynamic pages,
+    # we move the file that might be there so that the custom
+    # 404 will be triggered.
+    require MT::PublishOption;
+    if ( $map->build_type == MT::PublishOption::DYNAMIC() ) 
+    {
+        rename(
+            $finfo->file_path,    # is this just $file ?
+            $finfo->file_path . '.static'
+        );
+
+        ## If the FileInfo is set to static, flip it to virtual.
+        if ( !$finfo->virtual ) {
+            $finfo->virtual(1);
+            $finfo->save();
+        }
+    }
+
+    return 1 if ( $map->build_type == MT::PublishOption::DYNAMIC() );
+    return 1 if ( $entry && $entry->status != MT::Entry::RELEASE() );
+    return 1 unless ( $map->build_type );
+
+    my $timer = MT->get_timer;
+    if ($timer) {
+        $timer->pause_partial;
+    }
+    local $timer->{elapsed} = 0 if $timer;
+
+    if (
+        $build_static
+        && MT->run_callbacks(
+            'build_file_filter',
+            Context      => $ctx,
+            context      => $ctx,
+            ArchiveType  => $at,
+            archive_type => $at,
+            TemplateMap  => $map,
+            template_map => $map,
+            Blog         => $blog,
+            blog         => $blog,
+            Entry        => $entry,
+            entry        => $entry,
+            FileInfo     => $finfo,
+            file_info    => $finfo,
+            File         => $file,
+            file         => $file,
+            Template     => $tmpl,
+            template     => $tmpl,
+            PeriodStart  => $start,
+            period_start => $start,
+            Category     => $category,
+            category     => $category,
+            force        => ($args{Force} ? 1 : 0),
+            puboffline   => 1,
+        )
+      )
+    {
+
+        if ( $archiver->group_based ) {
+            require MT::Promise;
+            my $entries = sub { $archiver->archive_group_entries($ctx) };
+            $ctx->stash( 'entries', MT::Promise::delay($entries) );
+        }
+
+        my $html = undef;
+        $ctx->stash( 'blog', $blog );
+        $ctx->stash( 'entry', $entry ) if $entry;
+
+        require MT::Request;
+        MT::Request->instance->cache('build_template', $tmpl);
+
+        $html = $tmpl->build( $ctx, $cond );
+        unless (defined($html)) {
+            $timer->unpause if $timer;
+            require MT::I18N;
+            return $mt->error(
+            (
+                $category ? MT->translate(
+                    "An error occurred publishing [_1] '[_2]': [_3]",
+                    MT::I18N::lowercase( $category->class_label ),
+                    $category->id,
+                    $tmpl->errstr
+                  )
+                : $entry ? MT->translate(
+                    "An error occurred publishing [_1] '[_2]': [_3]",
+                    MT::I18N::lowercase( $entry->class_label ),
+                    $entry->title,
+                    $tmpl->errstr
+                  )
+                : MT->translate(
+"An error occurred publishing date-based archive '[_1]': [_2]",
+                    $at . $start,
+                    $tmpl->errstr
+                )
+            )
+          );
+        }
+        my $orig_html = $html;
+        MT->run_callbacks(
+            'build_page',
+            Context      => $ctx,
+            context      => $ctx,
+            ArchiveType  => $at,
+            archive_type => $at,
+            TemplateMap  => $map,
+            template_map => $map,
+            Blog         => $blog,
+            blog         => $blog,
+            Entry        => $entry,
+            entry        => $entry,
+            FileInfo     => $finfo,
+            file_info    => $finfo,
+            PeriodStart  => $start,
+            period_start => $start,
+            Category     => $category,
+            category     => $category,
+            RawContent   => \$orig_html,
+            raw_content  => \$orig_html,
+            Content      => \$html,
+            content      => \$html,
+            BuildResult  => \$orig_html,
+            build_result => \$orig_html,
+            Template     => $tmpl,
+            template     => $tmpl,
+            File         => $file,
+            file         => $file,
+            puboffline   => 1,
+        );
+
+        ## First check whether the content is actually
+        ## changed. If not, we won't update the published
+        ## file, so as not to modify the mtime.
+        unless ($fmgr->content_is_updated( $file, \$html )) {
+            $timer->unpause if $timer;
+            return 1;
+        }
+
+        ## Determine if we need to build directory structure,
+        ## and build it if we do. DirUmask determines
+        ## directory permissions.
+        require File::Spec;
+        my $path = dirname($file);
+        $path =~ s!/$!!
+          unless $path eq '/'; ## OS X doesn't like / at the end in mkdir().
+        unless ( $fmgr->exists($path) ) {
+            if (!$fmgr->mkpath($path)) {
+                $timer->unpause if $timer;
+                return $mt->trans_error( "Error making path '[_1]': [_2]",
+                    $path, $fmgr->errstr );
+            }
+        }
+
+        ## By default we write all data to temp files, then rename
+        ## the temp files to the real files (an atomic
+        ## operation). Some users don't like this (requires too
+        ## liberal directory permissions). So we have a config
+        ## option to turn it off (NoTempFiles).
+        my $use_temp_files = !$mt->{NoTempFiles};
+        my $temp_file = $use_temp_files ? "$file.new" : $file;
+        unless ( defined $fmgr->put_data( $html, $temp_file ) ) {
+            $timer->unpause if $timer;
+            return $mt->trans_error( "Writing to '[_1]' failed: [_2]",
+                $temp_file, $fmgr->errstr );
+        }
+        if ($use_temp_files) {
+            if (!$fmgr->rename( $temp_file, $file )) {
+                $timer->unpause if $timer;
+                return $mt->trans_error(
+                    "Renaming tempfile '[_1]' failed: [_2]",
+                    $temp_file, $fmgr->errstr );
+            }
+        }
+        MT->run_callbacks(
+            'build_file',
+            Context      => $ctx,
+            context      => $ctx,
+            ArchiveType  => $at,
+            archive_type => $at,
+            TemplateMap  => $map,
+            template_map => $map,
+            FileInfo     => $finfo,
+            file_info    => $finfo,
+            Blog         => $blog,
+            blog         => $blog,
+            Entry        => $entry,
+            entry        => $entry,
+            PeriodStart  => $start,
+            period_start => $start,
+            RawContent   => \$orig_html,
+            raw_content  => \$orig_html,
+            Content      => \$html,
+            content      => \$html,
+            BuildResult  => \$orig_html,
+            build_result => \$orig_html,
+            Template     => $tmpl,
+            template     => $tmpl,
+            Category     => $category,
+            category     => $category,
+            File         => $file,
+            file         => $file,
+            puboffline   => 1,
+        );
+    }
+    $timer->mark("total:rebuild_file[template_id:" . $tmpl->id . "]")
+        if $timer;
+    1;
+}
 
 1;
 

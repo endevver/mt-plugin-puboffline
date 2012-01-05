@@ -24,11 +24,12 @@ sub build_file_filter {
     my $output_file_path = get_output_path({ blog_id => $fi->blog_id });
     return 1 if !$output_file_path;
 
-    # This first block of code checks to see if the file being republished is
-    # coming from the PubOffline::Worker::PublishOffline worker. If it is,
-    # then we know that we need to set the IsOfflineMode tag context to true
-    # so that any offline templating publishing correctly.
-    if ($fi->{'is_offline_file'}) {
+    # Give up if this callback was *not* invoked for an offline publish job.
+    # (Callbacks from the PubOffline::Worker::PublishOffline worker include a
+    # `puboffline` key with the callback arguments.) If it is from an offline
+    # job, then we know that we need to set the IsOfflineMode tag context to
+    # true so that any offline templating publishing correctly.
+    if ( eval{$args{'puboffline'}} ) {
 
         # This flag is used for the IsOfflineMode tag.
         $args{'Context'}->stash('__offline_mode', 1);
@@ -58,7 +59,7 @@ sub build_page {
     my $fi     = $args{'file_info'};
     my $blog   = $args{'blog'};
     my $plugin = MT->component('PubOffline');
-
+    
     # We want to give up if PubOffline was not enabled on this blog.
     my $enabled = $plugin->get_config_value(
         'enable_puboffline',
@@ -74,8 +75,10 @@ sub build_page {
     return 1 if !$output_file_path;
 
     # Give up if this callback was *not* invoked for an offline publish job.
-    # Basically, if not coming from PubOffline::Worker::PublishOffline, quit.
-    return if !$fi->{'is_offline_file'};
+    # (Callbacks from the PubOffline::Worker::PublishOffline worker include a
+    # `puboffline` key with the callback arguments. If this is *not* present
+    # then we're not republishing an offline file, and should exit.)
+    return if !eval{$args{'puboffline'}};
 
     MT->log({
         blog_id => $blog->id,
