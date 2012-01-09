@@ -92,6 +92,13 @@ sub work {
         if (defined $result) {
             $job->completed();
             $rebuilt++;
+
+            MT->log({
+                blog_id => $asset->blog_id,
+                message => 'PubOffline: The asset ' . $asset->label
+                    . ' (' . $asset->file_name . ') was successfully updated.',
+                level   => MT::Log::INFO(),
+            });
         } else {
             # The error was already reported and logged in _hard_link or
             # _copy_asset so we don't need to do anything.
@@ -123,7 +130,7 @@ sub _copy_asset {
 
     my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
     my $dest   = File::Spec->catfile($output_file_path, $rel_file_path);
-    
+
     # Finally, copy the asset.
     my $result = fcopy( $source, $dest );
 

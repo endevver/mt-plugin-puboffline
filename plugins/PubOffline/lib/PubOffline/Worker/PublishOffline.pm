@@ -110,10 +110,10 @@ sub work {
             $job->completed();
             $rebuilt++;
         } else {
-            my $error = $mt->publisher->errstr;
+            my $error  = $mt->publisher->errstr;
             my $errmsg = $mt->translate(
-                "PubOffline: Error rebuilding file [_1]" 
-                . $fi->file_path . ": " . $error
+                "PubOffline: Error rebuilding file " . $fi->file_path 
+                . ": " . $error
             );
             MT::TheSchwartz->debug($errmsg);
             $job->permanent_failure($errmsg);

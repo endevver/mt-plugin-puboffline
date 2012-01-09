@@ -162,7 +162,7 @@ sub work {
             $job->completed();
 
             my $msg = $mt->translate(
-                "PubOffline finished copying static files from $source."
+                "PubOffline: Finished copying static files from $source."
             );
 
             MT::TheSchwartz->debug($msg);
