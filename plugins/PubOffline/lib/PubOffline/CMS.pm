@@ -67,6 +67,15 @@ sub jumpstart {
         });
 
         while ( my $fi = $fi_iter->() ) {
+            # Try loading the template identified in the fileinfo record.
+            # Continue if it is not a backup template, which would mean the
+            # fileinfo record shouldn't be republished.
+            next if !MT->model('template')->exist({
+                    id      => $fi->template_id,
+                    blog_id => $blog_id,
+                    type    => { not => 'backup' },
+                });
+
             # Create a Schwartz job for each file that needs to be published.
             PubOffline::Plugin::_create_publish_job({
                 fileinfo  => $fi,
