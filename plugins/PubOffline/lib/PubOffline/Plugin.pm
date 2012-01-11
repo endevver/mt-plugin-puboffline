@@ -113,27 +113,6 @@ sub build_page {
     foreach (@dirs_to_file) { unshift @reldirs,'..'; }
     # By this point @reldirs holds the relative directory components back to the root
 
-    # Content is the actual rendered page HTML. Search it for the $pattern to
-    # create a relative directory.
-    my $blog_site_url = $blog->site_url;
-    my $pattern = $blog_site_url;
-
-    # Try to use root relative URLs for the offline version of this blog?
-    my $root_relative_url_enabled = $plugin->get_config_value(
-        'root_relative_url',
-        'blog:'.$blog->id
-    );
-
-    if ( $root_relative_url_enabled ) {
-        # Create a root relative URL by removing the protocol and domain name.
-        my $root_relative_url = $blog->site_url;
-        $root_relative_url =~ s/^https?\:\/\/[^\/]*//i;
-
-        # The pattern should include both the blog site url and the root
-        # relative URL.
-        $pattern = "($blog_site_url|$root_relative_url)";
-    }
-
     my $content = $args{'Content'};
 
     # Static content may be specified with StaticWebPath or
@@ -174,6 +153,27 @@ sub build_page {
         }emgx;
     }
 
+    # $content is the actual rendered page HTML. Search it for the $pattern to
+    # create a relative directory.
+    my $blog_site_url = $blog->site_url;
+    my $pattern = "($blog_site_url)";
+
+    # Try to use root relative URLs for the offline version of this blog?
+    my $root_relative_url_enabled = $plugin->get_config_value(
+        'root_relative_url',
+        'blog:'.$blog->id
+    );
+
+    if ( $root_relative_url_enabled ) {
+        # Create a root relative URL by removing the protocol and domain name.
+        my $root_relative_url = $blog->site_url;
+        $root_relative_url =~ s/^https?\:\/\/[^\/]*//i;
+
+        # The pattern should include both the blog site url and the root
+        # relative URL.
+        $pattern = "($pattern|[^\"'\(]*$root_relative_url)";
+    }
+
     # Note: The CGIPath is used in mt.js, and may be used for commenting
     # forms,for example. Changing those to relative URLs doesn't really matter
     # because it'll point to something that doesn't work: mt-comments.cgi, for
@@ -185,9 +185,20 @@ sub build_page {
     # get back to the root of the blog.
     if ( scalar @dirs >= 1 ) {
         #print STDERR "$file_path is in a directory: $dirs_path.\n";
-        $$content =~ s{$pattern(.*?)("|')}{
-            my $quote  = $2;
-            my $target = $1;
+        $$content =~ s{("|'|\))$pattern(.*?)("|')}{
+            # Example result:
+            # $1: "
+            # $1: http://localhost/my_first_blog/
+            # $2: index.html
+            # $3: "
+            my $quote  = $1;
+            my $root   = $2;
+            my $target = $3;
+
+            # If the root relative option is enabled, the target is offset.
+            if ( $root_relative_url_enabled ) {
+                $target = $4;
+            }
 
             # Check if the target is a directory. Compare to the live
             # published site, because the offline destination may not have
@@ -206,21 +217,32 @@ sub build_page {
             my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
             my $path = caturl($new_dirs_path, $file);
             #print STDERR "Path will be $path\n";
-            $path . $quote;
+            $quote . $path . $quote;
         }emgx;
     }
     # If the file is at the root, we just need to generate a simple
     # relative URL that doesn't need to traverse up a folder at all.
     else {
         #print STDERR "$file_path is at the root.\n";
-        $$content =~ s{$pattern(.*?)("|')}{
-            my $quote  = $2;
-            my $target = $1;
+        $$content =~ s{("|'|\))$pattern(.*?)("|'|\))}{
+            # Example result:
+            # $1: "
+            # $1: http://localhost/my_first_blog/
+            # $2: index.html
+            # $3: "
+            my $quote  = $1;
+            my $root   = $2;
+            my $target = $3;
+
+            # If the root relative option is enabled, the target is offset.
+            if ( $root_relative_url_enabled ) {
+                $target = $4;
+            }
 
             # Remove the leading slash, if present. Since this file is at
             # the root of the site, there should be no URLs starting with
             # a slash.
-            $target =~ s/^\/(.*)$/$1/;
+            $target =~ s/^\/(.*)$/$root/;
 
             # Check if the target is a directory. Compare to the live
             # published site, because the offline destination may not have
@@ -241,7 +263,7 @@ sub build_page {
 
             # abs2rel will convert the path to something relative.
             # $quote is the single or double quote to be included.
-            File::Spec->abs2rel( $target ) . $quote;
+            $quote . File::Spec->abs2rel( $target ) . $quote;
         }emgx;
     }
 }
