@@ -95,8 +95,10 @@ sub work {
 
             MT->log({
                 blog_id => $asset->blog_id,
-                message => 'PubOffline: The asset ' . $asset->label
-                    . ' (' . $asset->file_name . ') was successfully updated.',
+                message => 'PubOffline: The asset ' 
+                    . ($asset->label . ' (' . $asset->file_name . ') '
+                        || $asset->file_name)
+                    . 'was successfully updated.',
                 level   => MT::Log::INFO(),
             });
         } else {
