@@ -45,18 +45,18 @@
             these are completed.
         </mtapp:statusmsg>
     </mt:If>
-    <mt:If name="deleted_archive">
+    <mt:If name="deleted_archives">
         <mtapp:statusmsg
-            id="deleted_archive"
+            id="deleted_archives"
             class="success">
-            The selected archive has been successfully deleted.
+            The selected archive(s) have been successfully deleted.
         </mtapp:statusmsg>
     </mt:If>
     <mt:If name="failed_delete">
         <mtapp:statusmsg
             id="failed_delete"
             class="error">
-            The selected offline archive could not be deleted. 
+            The selected offline archive(s) could not be deleted. 
             <mt:Var name="failed_delete">
         </mtapp:statusmsg>
     </mt:If>

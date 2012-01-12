@@ -140,7 +140,7 @@ sub manage {
 
     # Show any set system mesages.
     $param->{create_archive}  = $q->param('create_archive');
-    $param->{deleted_archive} = $q->param('deleted_archive');
+    $param->{deleted_archives} = $q->param('deleted_archives');
     $param->{failed_delete}   = $q->param('failed_delete');
 
     # Are there any Schwartz jobs for the offline site in queue? If so, we
