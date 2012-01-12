@@ -130,7 +130,13 @@ sub manage {
         unless $app->user->is_superuser()
             || $app->user->permissions($blog_id)->can_administer_blog();
 
-    my $config = $plugin->get_config_hash( 'blog:' . $blog_id );
+    # If PubOffline is not enabled for this blog, redirect to the Dashboard.
+    # This might happen when switching from one blog to another.
+    $app->redirect( $app->uri . '?__mode=dashboard&blog_id=' . $blog_id )
+        if !$plugin->get_config_value(
+            'enable_puboffline',
+            'blog:' . $blog_id
+        );;
 
     # Show any set system mesages.
     $param->{create_archive}  = $q->param('create_archive');
