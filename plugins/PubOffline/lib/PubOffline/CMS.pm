@@ -194,6 +194,12 @@ sub manage {
 
             my $file_path = File::Spec->catfile($archive_path, $file_name);
 
+            # Look at the last-modified time of the zip file. If it was last
+            # modified more than about five seconds ago it's safe to guess
+            # that the system has finished writing the file, so it can be
+            # shown in the listing.
+            next if -M $file_path < 0.00005;
+
             # Get the size of the zip file and turn it into something human-
             # readable.
             my $size = (stat $file_path)[7];
