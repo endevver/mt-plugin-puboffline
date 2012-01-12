@@ -8,7 +8,8 @@ use TheSchwartz::Job;
 use Time::HiRes qw( gettimeofday tv_interval );
 use PubOffline::Util qw( get_output_path get_archive_path path_exists );
 use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
-use MT::Util qw ( dirify );
+use MT::Util qw( dirify );
+use File::Copy qw( move );
 
 sub keep_exit_status_for { 1 }
 
@@ -124,7 +125,7 @@ sub _zip_offline {
     );
 
     # Finally, write the zip file to disk.
-    if ( $zip->writeToFileNamed($zip_dest) == AZ_OK ) {
+    if ( $zip->writeToFileNamed($zip_dest.'.tmp') == AZ_OK ) {
         # Success!
         MT->log({ 
             message => "Publish Offline created an archive of the offline " 
@@ -132,18 +133,26 @@ sub _zip_offline {
             blog_id => $blog_id,
             level   => MT::Log::INFO()
         });
-        return $zip_dest;
+
+        # After writing the zip file to disk, rename it from the temporary
+        # name to the "real" name. This rename operation keeps incomplete
+        # archives off of the Manage Offline Archives listing screen until
+        # they are complete.
+        my $result = move( $zip_dest.'.tmp', $zip_dest );
+        if ($result) {
+            return $zip_dest;
+        }
     }
-    # Failed to write the zip to the destination path!
-    else {
-        MT->log({ 
-            message => "Publish Offline was unable to create a zip archive "
-                . "at $zip_dest. Check folder permissions before retrying.",
-            blog_id => $blog_id,
-            level   => MT::Log::ERROR()
-        });
-        return 0;
-    }
+
+    # Failed to write the zip to the temp destination path, or failed to move
+    # the temp zip to the "real" path.
+    MT->log({ 
+        message => "Publish Offline was unable to create a zip archive "
+            . "at $zip_dest. Check folder permissions before retrying.",
+        blog_id => $blog_id,
+        level   => MT::Log::ERROR()
+    });
+    return 0;
 }
 
 # Send an email notification that the zip file has been created.
