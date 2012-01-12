@@ -185,19 +185,21 @@ sub build_page {
     # get back to the root of the blog.
     if ( scalar @dirs >= 1 ) {
         #print STDERR "$file_path is in a directory: $dirs_path.\n";
-        $$content =~ s{("|'|\))$pattern(.*?)("|')}{
+        $$content =~ s{("|'|\()$pattern(.*?)("|'|\))}{
             # Example result:
             # $1: "
-            # $1: http://localhost/my_first_blog/
-            # $2: index.html
-            # $3: "
-            my $quote  = $1;
-            my $root   = $2;
-            my $target = $3;
+            # $2: http://localhost/my_first_blog/
+            # $3: index.html
+            # $4: "
+            my $quote_open  = $1;
+            my $root        = $2;
+            my $target      = $3;
+            my $quote_close = $4;
 
             # If the root relative option is enabled, the target is offset.
             if ( $root_relative_url_enabled ) {
-                $target = $4;
+                $target      = $4;
+                $quote_close = $5;
             }
 
             # Check if the target is a directory. Compare to the live
@@ -217,26 +219,28 @@ sub build_page {
             my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
             my $path = caturl($new_dirs_path, $file);
             #print STDERR "Path will be $path\n";
-            $quote . $path . $quote;
+            $quote_open . $path . $quote_close;
         }emgx;
     }
     # If the file is at the root, we just need to generate a simple
     # relative URL that doesn't need to traverse up a folder at all.
     else {
         #print STDERR "$file_path is at the root.\n";
-        $$content =~ s{("|'|\))$pattern(.*?)("|'|\))}{
+        $$content =~ s{("|'|\()$pattern(.*?)("|'|\))}{
             # Example result:
             # $1: "
-            # $1: http://localhost/my_first_blog/
-            # $2: index.html
-            # $3: "
-            my $quote  = $1;
-            my $root   = $2;
-            my $target = $3;
+            # $2: http://localhost/my_first_blog/
+            # $3: index.html
+            # $4: "
+            my $quote_open  = $1;
+            my $root        = $2;
+            my $target      = $3;
+            my $quote_close = $4;
 
             # If the root relative option is enabled, the target is offset.
             if ( $root_relative_url_enabled ) {
-                $target = $4;
+                $target      = $4;
+                $quote_close = $5;
             }
 
             # Remove the leading slash, if present. Since this file is at
@@ -263,7 +267,7 @@ sub build_page {
 
             # abs2rel will convert the path to something relative.
             # $quote is the single or double quote to be included.
-            $quote . File::Spec->abs2rel( $target ) . $quote;
+            $quote_open . File::Spec->abs2rel( $target ) . $quote_close;
         }emgx;
     }
 }
