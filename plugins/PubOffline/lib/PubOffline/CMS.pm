@@ -350,16 +350,24 @@ sub download_archive {
     $app->set_header(
           Content_Disposition => 'attachment; filename="' . $filename . '"' );
 
+    require HTTP::Date;
+    my ( $size, $mtime ) = ( stat( $file ) )[ 7, 9 ];
+    $app->set_header( 'Content-Length' => $size );
+    $app->set_header( 'Last-Modified'  => HTTP::Date::time2str($mtime) )
+        if $mtime;
+
+    $app->response_content_type('application/zip');
+
     # Send the finalized headers to the client prior to the content
     $app->send_http_header();
 
     # Get a filehandle for the file so that the file contents can be streamed.
     use FileHandle;
     my $fh = FileHandle->new("< $file");
-    
+
     # Reset the file pointer
     seek( $fh, 0, 0 );
-    
+
     # Stream the file to the user's browser in chunks.
     while ( read( $fh, my $buffer, 8192 ) ) {
         $app->print($buffer);
