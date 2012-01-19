@@ -169,12 +169,23 @@ sub _send_notification {
         To      => $email, 
         Subject => '[' . $blog->name . '] Offline Archive Created',
     );
+    
+    my $app_url = MT->config('CGIPath') . MT->config('AdminScript');
+    # If $app_url doesn't start `http...` then CGIPath is specified as a
+    # root relative URL. Try to build a valid fully-qualified URL to be
+    # included in the email.
+    if ($app_url !~ /^http/) {
+        my $domain = $blog->site_url;
+        $domain =~ s/(^https?\:\/\/[^\/]*)(.*)/$1/i;
+        $app_url = $domain . $app_url;
+    }
 
     my $body = "The offline zip archive creation process has completed, and "
         . "$zip_file has been created.\n\n"
+        . "The offline zip archive may be downloaded at:\n\n"
+        . $app_url . "?__mode=po_dl_archive&file=$zip_file\n\n"
         . "Manage this and other offline archives at " 
-        . MT->config('CGIPath') . MT->config('AdminScript') 
-        . "?__mode=po_manage&blog_id=$blog_id";
+        . $app_url . "?__mode=po_manage&blog_id=$blog_id";
 
     MT::Mail->send(\%head, $body)
         or die MT->log({
