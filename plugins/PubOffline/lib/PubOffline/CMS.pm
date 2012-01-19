@@ -223,7 +223,8 @@ sub manage {
             my $period = 'AM'; # If $hour < 12, this is already correct.
             if ($hour >= 12) {
                 $period = 'PM';
-                $hour -= 12;
+                $hour -= 12
+                    if $hour != 12;
             }
             # Assemble a human-readable date.
             my $date = $months[$month] . ' ' . $day . ', ' . ($year+1900) 
