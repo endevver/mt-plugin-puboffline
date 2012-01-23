@@ -127,6 +127,19 @@
 </mtapp:setting>
 
 <mtapp:setting
+    id="exclude_manifest"
+    label_class="left-label"
+    label="<__trans phrase="Exclude File Manifest">"
+    hint="Their may be some files you don't want copied to the offline version (such as some index Templates, Entries, or Pages). Leave this textarea empty to copy all content offline. Alternatively, specify files to exclude with a path relative to the Offline Output File Path, specified above. Each exclude file path should be on a new line."
+    show_hint="1">
+    <textarea
+        id="exlcude_manifest"
+        name="exclude_manifest"
+        rows="5"
+        class="full-width"><mt:Var name="exclude_manifest" escape="html"></textarea>
+</mtapp:setting>
+
+<mtapp:setting
     id="jumpstart"
     label_class="left-label"
     label="<__trans phrase="Jumpstart this Blog">"

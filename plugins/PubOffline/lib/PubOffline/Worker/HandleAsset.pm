@@ -56,7 +56,6 @@ sub work {
         # doesn't exist.
         next if !$asset->file_path || !-e $asset->file_path;
 
-
         my $output_file_path = get_output_path({ 
             blog_id => $asset->blog_id,
         });
@@ -133,6 +132,27 @@ sub _copy_asset {
     my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
     my $dest   = File::Spec->catfile($output_file_path, $rel_file_path);
 
+    # Check if the file to be published is in the Exclude File Manifest,
+    # which would mean we should skip outputting this file. Build a regex
+    # using alternation to find a matching path or a partial match of a
+    # path (such as may be used to exclude an entire directory).
+    my @paths = get_exclude_manifest({ blog_id => $blog->id });
+    my $pattern = join('|', @paths);
+    if ( $dest =~ /($pattern)/ ) {
+        # The current file is in the Exclude File Manifest. Don't output
+        # this file, and try to delete it if it exists.
+        unlink $dest
+            if (-e $dest);
+
+        MT->log({
+            level   => MT->model('log')->INFO(),
+            blog_id => $asset->blog_id,
+            message => "PubOffline: the asset $dest has been excluded from "
+                . "the offline site."
+        });
+        return 1;
+    }
+
     # Finally, copy the asset.
     my $result = fcopy( $source, $dest );
 
@@ -175,6 +195,27 @@ sub _hard_link_asset {
 
     my $source = File::Spec->catfile($blog_site_path, $rel_file_path);
     my $dest   = File::Spec->catfile($output_file_path, $rel_file_path);
+
+    # Check if the file to be published is in the Exclude File Manifest,
+    # which would mean we should skip outputting this file. Build a regex
+    # using alternation to find a matching path or a partial match of a
+    # path (such as may be used to exclude an entire directory).
+    my @paths = get_exclude_manifest({ blog_id => $blog->id });
+    my $pattern = join('|', @paths);
+    if ( $dest =~ /($pattern)/ ) {
+        # The current file is in the Exclude File Manifest. Don't output
+        # this file, and try to delete it if it exists.
+        unlink $dest
+            if (-e $dest);
+
+        MT->log({
+            level   => MT->model('log')->INFO(),
+            blog_id => $asset->blog_id,
+            message => "PubOffline: the asset $dest has been excluded from "
+                . "the offline site."
+        });
+        return 1;
+    }
 
     # If the link already exists we can just give up -- since the link exists
     # it already points to the latest data. (It's also worth noting that 

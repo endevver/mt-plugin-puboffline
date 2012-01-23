@@ -50,6 +50,9 @@ settings:
     static_manifest:
         scope: blog
         default: ''
+    exclude_manifest:
+        scope: blog
+        default: ''
 
 blog_config_template:
     code: PubOffline::CMS::settings

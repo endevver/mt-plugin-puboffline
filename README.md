@@ -97,6 +97,12 @@ the Settings.
   folders on separate lines. The template tag StaticFilePath can be helpful in
   specifying content you want in the offline version.
 
+* Exclude File Manifest - their may be some files you don't want copied to the
+  offline version (such as some index Templates, Entries, or Pages). Leave
+  this textarea empty to copy all content offline. Alternatively, specify
+  files to exclude with a path relative to the Offline Output File Path,
+  specified above. Each exclude file path should be on a new line.
+
 * Jumpstart this Blog - an asset will be automatically copied or linked when
   the asset has been modified. However existing assets need a "jumpstart" to
   become part of the offline version. Similarly, static content will be copied

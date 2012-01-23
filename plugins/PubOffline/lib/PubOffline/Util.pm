@@ -7,7 +7,7 @@ use base 'Exporter';
 
 our @EXPORT_OK = qw( 
     get_output_path get_output_url get_archive_path render_template 
-    path_exists
+    path_exists get_exclude_manifest
 );
 
 # The output file path is set in the plugin's Settings, and can contain MT
@@ -147,6 +147,34 @@ sub path_exists {
         
         return 0;
     }
+}
+
+# Get the Exclude File Manifest contents and build an array of files to *not*
+# be exported.
+sub get_exclude_manifest {
+    my ($arg_refs) = @_;
+    my $blog_id = $arg_refs->{blog_id};
+    my $plugin = MT->component('PubOffline');
+    my @paths;
+
+    my $manifest = $plugin->get_config_value(
+        'exclude_manifest',
+        'blog:' . $blog_id
+    );
+
+    return @paths if !$manifest;
+
+    my $output_file_path = get_output_path({ blog_id => $blog_id });
+
+    # Split the saved manifest contents on new lines, then process each item.
+    # Items are specified with a relative path; prepend the Offline Output
+    # Path so that they are absolute.
+    my @files = split(/\s*[\r\n]\s*/, $manifest);
+    foreach my $file ( @files ) {
+        push @paths, File::Spec->catfile($output_file_path, $file);
+    }
+
+    return @paths;
 }
 
 1;

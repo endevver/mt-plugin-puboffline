@@ -8,7 +8,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use MT::FileInfo;
 use MT::PublishOption;
 use MT::Util qw( log_time );
-use PubOffline::Util qw( get_output_path path_exists );
+use PubOffline::Util qw( get_output_path path_exists get_exclude_manifest );
 use File::Basename;
 
 sub keep_exit_status_for { 1 }
@@ -77,8 +77,29 @@ sub work {
         my $fp = $fi->file_path;
         $fp =~ s/^$blog_site_path(\/)*//;
         my $np = File::Spec->catfile($output_file_path, $fp);
-        # TODO - change $fi record to point to different base directory
         $fi->file_path($np);
+
+        # Check if the file to be published is in the Exclude File Manifest,
+        # which would mean we should skip outputting this file. Build a regex
+        # using alternation to find a matching path or a partial match of a
+        # path (such as may be used to exclude an entire directory).
+        my @paths = get_exclude_manifest({ blog_id => $blog->id });
+        my $pattern = join('|', @paths);
+        if ( $np =~ /($pattern)/ ) {
+            # The current file is in the Exclude File Manifest. Don't output
+            # this file, and try to delete it if it exists.
+            unlink $np
+                if (-e $np);
+
+            MT->log({
+                level   => MT->model('log')->INFO(),
+                blog_id => $blog->id,
+                message => "PubOffline: the file $np has been excluded from "
+                    . "the offline site."
+            });
+            $job->completed();
+            next;
+        }
 
         my $priority = $job->priority ? ", priority " . $job->priority : "";
 
