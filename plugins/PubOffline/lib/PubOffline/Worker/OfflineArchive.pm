@@ -10,6 +10,7 @@ use PubOffline::Util qw( get_output_path get_archive_path path_exists );
 use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
 use MT::Util qw( dirify );
 use File::Copy qw( move );
+use File::Find;
 
 sub keep_exit_status_for { 1 }
 
@@ -49,6 +50,10 @@ sub work {
         my $mt_job = MT->model('ts_job')->load( $job->jobid );
 
         my $blog_id = $mt_job->uniqkey;
+
+        # Clean-up the offline site by deleting any emtpy folders.
+        my $output_file_path  = get_output_path({ blog_id => $blog_id, });
+        finddepth(sub { rmdir $_ if -d }, $output_file_path);
 
         # Create the zip file. Result should contain 
         my $zip_file = _zip_offline({ blog_id => $blog_id });
