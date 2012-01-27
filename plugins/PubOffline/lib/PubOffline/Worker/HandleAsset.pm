@@ -6,7 +6,7 @@ use base qw( TheSchwartz::Worker );
 
 use TheSchwartz::Job;
 use Time::HiRes qw(gettimeofday tv_interval);
-use PubOffline::Util qw( get_output_path path_exists );
+use PubOffline::Util qw( get_output_path path_exists get_exclude_manifest );
 use File::Copy::Recursive qw(fcopy);
 use File::Basename;
 
