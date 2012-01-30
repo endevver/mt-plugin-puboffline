@@ -169,7 +169,7 @@ sub get_exclude_manifest {
     # Split the saved manifest contents on new lines, then process each item.
     # Items are specified with a relative path; prepend the Offline Output
     # Path so that they are absolute.
-    my @files = split(/\s*[\r\n]\s*/, $manifest);
+    my @files = split(/\s*[\r\n\s,]\s*/, $manifest);
     foreach my $file ( @files ) {
         push @paths, File::Spec->catfile($output_file_path, $file);
     }

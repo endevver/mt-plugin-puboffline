@@ -468,7 +468,7 @@ sub _create_static_handling_jobs {
         # The manifest can contain many paths, each on their own line. Split
         # on the new line and put them into an array so they can be processed.
         # Also, chop off any leading or trailing white space.
-        my @paths = split(/\s*[\r\n]\s*/, $static_manifest);
+        my @paths = split(/\s*[\r\n\s,]\s*/, $static_manifest);
 
         foreach my $path (@paths) {
             # If a template tag was used in specifying the path we want to
