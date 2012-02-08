@@ -370,7 +370,7 @@ sub cms_post_save_asset {
         'enable_puboffline',
         'blog:' . $asset->blog_id
     );
-    return if !$enabled;
+    return 1 if !$enabled;
 
     _create_asset_handling_job({ asset => $asset, });
 }
@@ -385,7 +385,7 @@ sub cms_upload_file {
         'enable_puboffline',
         'blog:' . $params{blog}
     );
-    return if !$enabled;
+    return 1 if !$enabled;
 
     _create_asset_handling_job({ asset => $params{asset}, });
 }
