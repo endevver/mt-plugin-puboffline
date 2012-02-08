@@ -12,6 +12,7 @@ callbacks:
     build_page:          PubOffline::Plugin::build_page
     cms_post_save.asset: PubOffline::Plugin::cms_post_save_asset
     cms_upload_file:     PubOffline::Plugin::cms_upload_file
+    cms_upload_image:    PubOffline::Plugin::cms_upload_file
 
 task_workers:
     publish_offline:
