@@ -6,8 +6,8 @@ use warnings;
 use base 'Exporter';
 
 our @EXPORT_OK = qw( 
-    get_output_path get_output_url get_archive_path render_template 
-    path_exists get_exclude_manifest
+    get_output_path get_output_url get_archive_path render_template
+    path_exists get_exclude_manifest get_url_exception_manifest
 );
 
 # The output file path is set in the plugin's Settings, and can contain MT
@@ -175,6 +175,33 @@ sub get_exclude_manifest {
     }
 
     return @paths;
+}
+
+# Get the URL Exception Manifest contents and build an array of URLs to *not*
+# be rewritten.
+sub get_url_exception_manifest {
+    my ($arg_refs) = @_;
+    my $blog_id = $arg_refs->{blog_id};
+    my $plugin = MT->component('PubOffline');
+    my @url_exceptions;
+
+    my $manifest = $plugin->get_config_value(
+        'url_exception_manifest',
+        'blog:' . $blog_id
+    );
+
+    return @url_exceptions if !$manifest;
+
+    my $output_file_path = get_output_path({ blog_id => $blog_id });
+
+    # Split the saved manifest contents on new lines, then process each item.
+    # Items are specified with a FQDN URL.
+    my @urls = split(/\s*[\r\n\s,]\s*/, $manifest);
+    foreach my $url ( @urls ) {
+        push @url_exceptions, $url;
+    }
+
+    return @url_exceptions;
 }
 
 1;

@@ -2,7 +2,9 @@ package PubOffline::Plugin;
 
 use strict;
 use MT::Util qw( format_ts caturl dirify );
-use PubOffline::Util qw( get_output_path render_template );
+use PubOffline::Util qw(
+    get_output_path render_template get_url_exception_manifest
+);
 
 # Any time a template is published, it goes through the build_filter_filter.
 # PubOffline works by hooking into this callback and publishing an additional
@@ -115,6 +117,11 @@ sub build_page {
 
     my $content = $args{'Content'};
 
+    # Use the URL Exception Manifest to determine if there are any URLs that
+    # should *not* be rewritten for the offline version. (There may be some
+    # URLs that should always go to the live site.)
+    my @url_exceptions = get_url_exception_manifest({ blog_id => $blog->id });
+
     # Static content may be specified with StaticWebPath or
     # PluginStaticWebPath, so we need to fix those URLs. Do this before fixing
     # any other URL because StaticWebPath may be in the BlogURL, but different
@@ -202,22 +209,36 @@ sub build_page {
                 $quote_close = $5;
             }
 
-            # Check if the target is a directory. Compare to the live
-            # published site, because the offline destination may not have
-            # been published yet.
-            if ( -d $blog_site_path.$target ) {
-                # This is a directory. We can't have a bare directory in
-                # the offline version, because clicking a link to it will
-                # just show the contents of the directory.
-                # So, append "index.html"
-                $target = $target . '/' if $target !~ /\/$/;
-                $target .= 'index.html';
+            # The final URL to use will be saved to $path, whether relative or
+            # fully-qualified.
+            my $path;
+
+            # Look for the current URL in the URL exception manifest. If found
+            # then skip this URL; if not found, rewrite it.
+            my $url = $root . $target;
+            if ( grep(/$url/i, @url_exceptions) ) {
+                # This URL is not supposed to be rewritten.
+                $path = $url;
+            }
+            else {
+                # Check if the target is a directory. Compare to the live
+                # published site, because the offline destination may not have
+                # been published yet.
+                if ( -d $blog_site_path.$target ) {
+                    # This is a directory. We can't have a bare directory in
+                    # the offline version, because clicking a link to it will
+                    # just show the contents of the directory.
+                    # So, append "index.html"
+                    $target = $target . '/' if $target !~ /\/$/;
+                    $target .= 'index.html';
+                }
+
+                ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
+                @dirs = File::Spec->splitdir( $dirs_path );
+                my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
+                $path = caturl($new_dirs_path, $file);
             }
 
-            ($vol, $dirs_path, $file) = File::Spec->splitpath($target);
-            @dirs = File::Spec->splitdir( $dirs_path );
-            my $new_dirs_path = File::Spec->catdir( @reldirs, @dirs );
-            my $path = caturl($new_dirs_path, $file);
             #print STDERR "Path will be $path\n";
             $quote_open . $path . $quote_close;
         }emgx;
@@ -243,31 +264,47 @@ sub build_page {
                 $quote_close = $5;
             }
 
-            # Remove the leading slash, if present. Since this file is at
-            # the root of the site, there should be no URLs starting with
-            # a slash.
-            $target =~ s/^\/(.*)$/$root/;
+            # The final URL to use will be saved to $path, whether relative or
+            # fully-qualified.
+            my $path;
 
-            # Check if the target is a directory. Compare to the live
-            # published site, because the offline destination may not have
-            # been published yet.
-            if ( -d $blog_site_path.$target ) {
-                # This is a directory. We can't have a bare directory in
-                # the offline version, because clicking a link to it will
-                # just show the contents of the directory.
-                # So, append "index.html"
-                if ($target ne '') {
-                    # $target will equal '' if it's the blog URL. We don't
-                    # want to prepend a slash for this. because it'll make
-                    # File::Spec->abs2rel() create a funky URL.
-                    $target = $target . '/' if $target !~ /\/$/;
+            # Look for the current URL in the URL exception manifest. If found
+            # then skip this URL; if not found, rewrite it.
+            my $url = $root . $target;
+            if ( grep(/$url/i, @url_exceptions) ) {
+                # This URL is not supposed to be rewritten.
+                $path = $url;
+            }
+            else {
+                # Remove the leading slash, if present. Since this file is at
+                # the root of the site, there should be no URLs starting with
+                # a slash.
+                $target =~ s/^\/(.*)$/$root/;
+
+                # Check if the target is a directory. Compare to the live
+                # published site, because the offline destination may not have
+                # been published yet.
+                if ( -d $blog_site_path.$target ) {
+                    # This is a directory. We can't have a bare directory in
+                    # the offline version, because clicking a link to it will
+                    # just show the contents of the directory.
+                    # So, append "index.html"
+                    if ($target ne '') {
+                        # $target will equal '' if it's the blog URL. We don't
+                        # want to prepend a slash for this. because it'll make
+                        # File::Spec->abs2rel() create a funky URL.
+                        $target = $target . '/' if $target !~ /\/$/;
+                    }
+                    $target .= 'index.html';
                 }
-                $target .= 'index.html';
+
+                # abs2rel will convert the path to something relative.
+                # $quote is the single or double quote to be included.
+                $path = File::Spec->abs2rel( $target );
             }
 
-            # abs2rel will convert the path to something relative.
-            # $quote is the single or double quote to be included.
-            $quote_open . File::Spec->abs2rel( $target ) . $quote_close;
+            #print STDERR "Path will be $path\n";
+            $quote_open . $path . $quote_close;
         }emgx;
     }
 }

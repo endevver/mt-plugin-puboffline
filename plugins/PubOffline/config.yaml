@@ -5,7 +5,7 @@ author_name: Endevver
 author_link: http://endevver.com
 plugin_link: https://github.com/endevver/mt-plugin-puboffline
 doc_link: https://github.com/endevver/mt-plugin-puboffline/blob/master/README.md
-version: 1.0.6
+version: 1.0.7
 
 callbacks:
     build_file_filter:   PubOffline::Plugin::build_file_filter
@@ -54,6 +54,9 @@ settings:
         scope: blog
         default: ''
     exclude_manifest:
+        scope: blog
+        default: ''
+    url_exception_manifest:
         scope: blog
         default: ''
 

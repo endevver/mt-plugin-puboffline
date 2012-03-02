@@ -103,6 +103,12 @@ the Settings.
   files to exclude with a path relative to the Offline Output File Path,
   specified above. Each exclude file path should be on a new line.
 
+* URL Exception Manifest - their may be some URLs you don't want rewritten for
+  the offline version. (That is, you want the URL to go to the same
+  fully-qualified domain name whether part of the Offline version or not.)
+  Leave this textarea empty to rewrite all URLs. Alternatively, specify
+  fully-qualified domain name URLs to *not* be rewritten, one per line.
+
 * Jumpstart this Blog - an asset will be automatically copied or linked when
   the asset has been modified. However existing assets need a "jumpstart" to
   become part of the offline version. Similarly, static content will be copied

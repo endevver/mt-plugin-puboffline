@@ -140,6 +140,19 @@
 </mtapp:setting>
 
 <mtapp:setting
+    id="url_exception_manifest"
+    label_class="left-label"
+    label="<__trans phrase="URL Exception Manifest">"
+    hint="Their may be some URLs you don't want rewritten for the offline version. (That is, you want the URL to go to the same fully-qualified domain name whether part of the Offline version or not.) Leave this textarea empty to rewrite all URLs. Alternatively, specify fully-qualified domain name URLs to <em>not</em> be rewritten, one per line."
+    show_hint="1">
+    <textarea
+        id="url_exception_manifest"
+        name="url_exception_manifest"
+        rows="5"
+        class="full-width"><mt:Var name="url_exception_manifest" escape="html"></textarea>
+</mtapp:setting>
+
+<mtapp:setting
     id="jumpstart"
     label_class="left-label"
     label="<__trans phrase="Jumpstart this Blog">"
